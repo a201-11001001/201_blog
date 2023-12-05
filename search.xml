@@ -2,7 +2,7 @@
 <search>
   <entry>
     <title>Aop复盘（日志功能）</title>
-    <url>/2023/11/22/Aop%E5%A4%8D%E7%9B%98%EF%BC%88%E6%97%A5%E5%BF%97%E5%8A%9F%E8%83%BD%EF%BC%89/</url>
+    <url>/2023/10/20/Aop%E5%A4%8D%E7%9B%98%EF%BC%88%E6%97%A5%E5%BF%97%E5%8A%9F%E8%83%BD%EF%BC%89/</url>
     <content><![CDATA[<h3 id="Aop-实现-自定义注解实现-异步日志记录"><a href="#Aop-实现-自定义注解实现-异步日志记录" class="headerlink" title="Aop 实现+自定义注解实现 异步日志记录"></a>Aop 实现+自定义注解实现 异步日志记录</h3><h5 id="设计思路"><a href="#设计思路" class="headerlink" title="设计思路"></a>设计思路</h5><p>通过自定义注解及 aop 切面 + huto 工具类实现异步记录操作日志</p>
 <hr>
 <ol>
@@ -19,6 +19,137 @@
       <tags>
         <tag>Spring</tag>
         <tag>Aop</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>MVCC机制</title>
+    <url>/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/</url>
+    <content><![CDATA[<h4 id="多版本并发控制-Multi-Version-Concurrency-Control"><a href="#多版本并发控制-Multi-Version-Concurrency-Control" class="headerlink" title="多版本并发控制 (Multi-Version Concurrency Control)"></a>多版本并发控制 (Multi-Version Concurrency Control)</h4><p>MVCC 是一种并发控制机制，用于在多个并发事务同时读写数据库时保持数据的一致性和隔离性。它是通过在每个数据行上维护多个版本的数据来实现的。当一个事务要对数据库中的数据进行修改时，MVCC 会为该事务创建一个数据快照，而不是直接修改实际的数据行。</p>
+<blockquote>
+<p>MVCC 机制只有在 PR、PC下兼容，其他隔离界别下没有</p>
+</blockquote>
+<hr>
+<h5 id="InnoDB-对-MVCC-的实现"><a href="#InnoDB-对-MVCC-的实现" class="headerlink" title="InnoDB 对 MVCC 的实现"></a>InnoDB 对 MVCC 的实现</h5><p>MVCC 的实现依赖于：隐藏字段、Read View、undo log。在内部实现中，InnoDB 通过数据行的 DB_TRX_ID 和 Read View 来判断数据的可见性，如不可见，则通过数据行的 DB_ROLL_PTR 找到 undo log 中的历史版本。每个事务读到的数据版本可能是不一样的，在同一个事务中，用户只能看到该事务创建 Read View 之前已经提交的修改和该事务本身做的修改</p>
+<h5 id="Innodb隐藏字段"><a href="#Innodb隐藏字段" class="headerlink" title="Innodb隐藏字段"></a>Innodb隐藏字段</h5><ol>
+<li><p>DB_ROW_ID<br>行标识（隐藏单调自增 ID），大小为 6 字节，如果表没有主键，InnoDB 会自动生成一个隐藏主键，因此会出现这个列。如果没有设置主键且该表没有唯一非空索引时，InnoDB 会使用该 id 来生成聚簇索引</p>
+</li>
+<li><p>DB_TRX_ID（最近一次提交事务的ID）：修改表数据时，都会提交事务，每个事务都有一个唯一的ID，这个字段就记录了最近一次提交事务的ID。另外，每条记录的头信息（record header）里都有一个专门的 bit（deleted_flag）来表示当前记录是否已经被删除。</p>
+</li>
+<li><p>DB_ROLL_PTR（上个版本的地址）：修改表数据时，旧版本的数据都会被记录到Undo Log日志中，每个版本的数据都有一个版本地址，这个字段记录的就是上个版本的地址。（回滚指针，指向该行的 undo log 。如果该行未被更新，则为空）</p>
+</li>
+</ol>
+<h5 id="read-view"><a href="#read-view" class="headerlink" title="read view"></a>read view</h5><blockquote>
+<p>在 read committed 和 read repeatable 隔离级别下，MVCC 采用read view 来实现的，它们的区别在于创建 read view 时机不同：<br>Read View 主要是用来做可见性判断，里面保存了 “当前对本事务不可见的其他活跃事务”</p>
+</blockquote>
+<h5 id="主要有以下字段："><a href="#主要有以下字段：" class="headerlink" title="主要有以下字段："></a>主要有以下字段：</h5><ul>
+<li>m_low_limit_id：目前出现过的最大的事务 ID+1，即下一个将被分配的事务 ID。大于等于这个 ID 的数据版本均不可见</li>
+<li>m_up_limit_id：活跃事务列表 m_ids 中最小的事务 ID，如果 m_ids 为空，则 m_up_limit_id 为 m_low_limit_id。小于这个 ID 的数据版本均可见</li>
+<li>m_ids：Read View 创建时其他未提交的活跃事务 ID 列表。创建 Read View时，将当前未提交事务 ID 记录下来，后续即使它们修改了记录行的值，对于当前事务也是不可见的。m_ids 不包括当前事务自己和已提交的事务（正在内存中）</li>
+<li>m_creator_trx_id：创建该 Read View 的事务 ID</li>
+</ul>
+<h5 id="事务可见性示意图"><a href="#事务可见性示意图" class="headerlink" title="事务可见性示意图"></a>事务可见性示意图</h5><p><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/read-view-visibility.png" alt="事务可见性示意图"></p>
+<h5 id="undo-log"><a href="#undo-log" class="headerlink" title="undo-log"></a>undo-log</h5><blockquote>
+<p>undo log 主要有两个作用：</p>
+</blockquote>
+<p>当事务回滚时用于将数据恢复到修改前的样子<br>另一个作用是 MVCC ，当读取记录时，若该记录被其他事务占用或当前版本对该事务不可见，则可以通过 undo log 读取之前的版本数据，以此实现非锁定读</p>
+<h5 id="在-InnoDB-存储引擎中-undo-log-分为两种：insert-undo-log-和-update-undo-log："><a href="#在-InnoDB-存储引擎中-undo-log-分为两种：insert-undo-log-和-update-undo-log：" class="headerlink" title="在 InnoDB 存储引擎中 undo log 分为两种：insert undo log 和 update undo log："></a>在 InnoDB 存储引擎中 undo log 分为两种：insert undo log 和 update undo log：</h5><ol>
+<li><p>insert undo log：指在 insert 操作中产生的 undo log。因为 insert 操作的记录只对事务本身可见，对其他事务不可见，故该 undo log 可以在事务提交后直接删除。不需要进行 purge 操作<br>insert 时的数据初始状态：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/mvcc_1.png" alt="mvcc_1"></p>
+</li>
+<li><p>update undo log：update 或 delete 操作中产生的 undo log。该 undo log可能需要提供 MVCC 机制，因此不能在事务提交时就进行删除。提交时放入 undo log 链表，等待 purge线程 进行最后的删除</p>
+</li>
+</ol>
+<h5 id="数据第一次被修改时："><a href="#数据第一次被修改时：" class="headerlink" title="数据第一次被修改时："></a>数据第一次被修改时：</h5><p><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_2.png" alt="mvcc_2"></p>
+<h5 id="数据第二次被修改时："><a href="#数据第二次被修改时：" class="headerlink" title="数据第二次被修改时："></a>数据第二次被修改时：</h5><p><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_3.png" alt="mvcc_3"></p>
+<p>不同事务或者相同事务的对同一记录行的修改，会使该记录行的 undo log 成为一条链表，链首就是最新的记录，链尾就是最早的旧记录。</p>
+<h5 id="数据可见性算法"><a href="#数据可见性算法" class="headerlink" title="数据可见性算法"></a>数据可见性算法</h5><p>在 InnoDB 存储引擎中，创建一个新事务后，执行每个 select 语句前，都会创建一个快照（Read View），<strong>快照中保存了当前数据库系统中正处于活跃（没有 commit）的事务的 ID 号</strong>。其实简单的说保存的是系统中当前不应该被本事务看到的其他事务 ID 列表（即 m_ids）。当用户在这个事务中要读取某个记录行的时候，InnoDB 会将该记录行的 DB_TRX_ID 与 Read View 中的一些变量及当前事务 ID 进行比较，判断是否满足可见性条件</p>
+<p>具体的比较算法如下(图源)：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_4.png" alt="mvcc_4"></p>
+<ol>
+<li><p>如果记录 DB_TRX_ID &lt; m_up_limit_id，那么表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照之前就提交了，所以该记录行的值对当前事务是可见的</p>
+</li>
+<li><p>如果 DB_TRX_ID &gt;&#x3D; m_low_limit_id，那么表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照之后才修改该行，所以该记录行的值对当前事务不可见。跳到步骤 5</p>
+</li>
+<li><p>m_ids 为空，则表明在当前事务创建快照之前，修改该行的事务就已经提交了，所以该记录行的值对当前事务是可见的</p>
+</li>
+<li><p>如果 m_up_limit_id &lt;&#x3D; DB_TRX_ID &lt; m_low_limit_id，表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照的时候可能处于“活动状态”或者“已提交状态”；所以就要对活跃事务列表 m_ids 进行查找（源码中是用的二分查找，因为是有序的）</p>
+</li>
+<li><p>如果在活跃事务列表 m_ids 中能找到 DB_TRX_ID，表明：① 在当前事务创建快照前，该记录行的值被事务 ID 为 DB_TRX_ID 的事务修改了，但没有提交；或者 ② 在当前事务创建快照后，该记录行的值被事务 ID 为 DB_TRX_ID 的事务修改了。这些情况下，这个记录行的值对当前事务都是不可见的。跳到步骤 5</p>
+</li>
+<li><p>在活跃事务列表中找不到，则表明“id 为 trx_id 的事务”在修改“该记录行的值”后，在“当前事务”创建快照前就已经提交了，所以记录行对当前事务可见</p>
+</li>
+<li><p>在该记录行的 DB_ROLL_PTR 指针所指向的 undo log 取出快照记录，用快照记录的 DB_TRX_ID 跳到步骤 1 重新开始判断，直到找到满足的快照版本或返回空</p>
+</li>
+</ol>
+<h5 id="RC-和-RR-隔离级别下-MVCC-的差异"><a href="#RC-和-RR-隔离级别下-MVCC-的差异" class="headerlink" title="RC 和 RR 隔离级别下 MVCC 的差异"></a>RC 和 RR 隔离级别下 MVCC 的差异</h5><p>在事务隔离级别 RC 和 RR （InnoDB 存储引擎的默认事务隔离级别）下，InnoDB 存储引擎使用 MVCC（非锁定一致性读），但它们生成 Read View 的时机却不同</p>
+<ul>
+<li>在 RC 隔离级别下的 每次select 查询前都生成一个Read View (m_ids 列表)</li>
+<li>在 RR 隔离级别下只在事务开始后 第一次select 数据前生成一个Read View（m_ids 列表）</li>
+</ul>
+<h5 id="MVCC-解决不可重复读问题"><a href="#MVCC-解决不可重复读问题" class="headerlink" title="MVCC 解决不可重复读问题"></a>MVCC 解决不可重复读问题</h5><p>虽然 RC 和 RR 都通过 MVCC 来读取快照数据，但由于 生成 Read View 时机不同，从而在 RR 级别下实现可重复读</p>
+<p>举个例子：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_5.png" alt="mvcc_5"></p>
+<h5 id="在-RC-下-ReadView-生成情况"><a href="#在-RC-下-ReadView-生成情况" class="headerlink" title="在 RC 下 ReadView 生成情况"></a>在 RC 下 ReadView 生成情况</h5><ol>
+<li>假设时间线来到 T4 ，那么此时数据行 id &#x3D; 1 的版本链为：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_6.png" alt="mvcc_6"></li>
+</ol>
+<p>由于 RC 级别下每次查询都会生成Read View ，并且事务 101、102 并未提交，此时 103 事务生成的 Read View 中活跃的事务 m_ids 为：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
+<ul>
+<li>此时最新记录的 DB_TRX_ID 为 101，m_up_limit_id &lt;&#x3D; 101 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</li>
+<li>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</li>
+<li>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</li>
+</ul>
+<ol start="2">
+<li>时间线来到 T6 ，数据的版本链为：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_7.png" alt="mvcc_7"></li>
+</ol>
+<p>因为在 RC 级别下，重新生成 Read View，这时事务 101 已经提交，102 并未提交，所以此时 Read View 中活跃的事务 m_ids：[102] ，m_low_limit_id为：104，m_up_limit_id为：102，m_creator_trx_id为：103</p>
+<ul>
+<li><p>此时最新记录的 DB_TRX_ID 为 102，m_up_limit_id &lt;&#x3D; 102 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</p>
+</li>
+<li><p>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 为 101，满足 101 &lt; m_up_limit_id，记录可见，所以在 T6 时间点查询到数据为 name &#x3D; 李四，与时间 T4 查询到的结果不一致，不可重复读！</p>
+</li>
+</ul>
+<ol start="3">
+<li>时间线来到 T9 ，数据的版本链为：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_8.png" alt="mvcc_8"></li>
+</ol>
+<p>重新生成 Read View， 这时事务 101 和 102 都已经提交，所以 m_ids 为空，则 m_up_limit_id &#x3D; m_low_limit_id &#x3D; 104，最新版本事务 ID 为 102，满足 102 &lt; m_low_limit_id，可见，查询结果为 name &#x3D; 赵六</p>
+<blockquote>
+<p>总结： 在 RC 隔离级别下，事务在每次查询开始时都会生成并设置新的 Read View，所以导致不可重复读</p>
+</blockquote>
+<h5 id="在-RR-下-ReadView-生成情况"><a href="#在-RR-下-ReadView-生成情况" class="headerlink" title="在 RR 下 ReadView 生成情况"></a>在 RR 下 ReadView 生成情况</h5><p>在可重复读级别下，只会在事务开始后第一次读取数据时生成一个 Read View（m_ids 列表）</p>
+<ol>
+<li>在 T4 情况下的版本链为：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_9.png" alt="mvcc_9"></li>
+</ol>
+<p>在当前执行 select 语句时生成一个 Read View，此时 m_ids：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
+<p>此时和 RC 级别下一样：</p>
+<ul>
+<li>最新记录的 DB_TRX_ID 为 101，m_up_limit_id &lt;&#x3D; 101 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</li>
+<li>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</li>
+<li>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</li>
+</ul>
+<ol start="2">
+<li>时间点 T6 情况下：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_10.png" alt="mvcc_10"></li>
+</ol>
+<p>在 RR 级别下只会生成一次Read View，所以此时依然沿用 m_ids：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
+<ul>
+<li><p>最新记录的 DB_TRX_ID 为 102，m_up_limit_id &lt;&#x3D; 102 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</p>
+</li>
+<li><p>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 为 101，不可见</p>
+</li>
+<li><p>继续根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</p>
+</li>
+<li><p>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</p>
+</li>
+</ul>
+<ol start="3">
+<li>时间点 T9 情况下：<br><img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" alt="mvcc_11"><!-- <img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" class="" title="mvcc_11"> -->
+<!-- <img src="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" class="" title="[title]"> --></li>
+</ol>
+<p>此时情况跟 T6 完全一样，由于已经生成了 Read View，此时依然沿用 m_ids：[101,102] ，所以查询结果依然是 name &#x3D; 菜花</p>
+<h4 id="MVCC➕Next-key-Lock-防止幻读"><a href="#MVCC➕Next-key-Lock-防止幻读" class="headerlink" title="MVCC➕Next-key-Lock 防止幻读"></a>MVCC➕Next-key-Lock 防止幻读</h4><hr>
+<p>InnoDB存储引擎在 RR 级别下通过 MVCC和 Next-key Lock 来解决幻读问题<br>1、执行普通 select，此时会以 MVCC 快照读的方式读取数据</p>
+<p>在快照读的情况下，RR 隔离级别只会在事务开启后的第一次查询生成 Read View ，并使用至事务提交。所以在生成 Read View 之后其它事务所做的更新、插入记录版本对当前事务并不可见，实现了可重复读和防止快照读下的 “幻读”</p>
+<p>2、执行 select…for update&#x2F;lock in share mode、insert、update、delete 等当前读</p>
+<p>在当前读下，读取的都是最新的数据，如果其它事务有插入新的记录，并且刚好在当前事务查询范围内，就会产生幻读！InnoDB 使用 Next-key Lock 来防止这种情况。当执行当前读时，会锁定读取到的记录的同时，锁定它们的间隙，防止其它事务在查询范围内插入数据。只要我不让你插入，就不会发生幻读</p>
+]]></content>
+      <tags>
+        <tag>MySql</tag>
       </tags>
   </entry>
   <entry>
@@ -70,134 +201,60 @@
       </tags>
   </entry>
   <entry>
-    <title>MVCC机制</title>
-    <url>/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/</url>
-    <content><![CDATA[<h4 id="多版本并发控制-Multi-Version-Concurrency-Control"><a href="#多版本并发控制-Multi-Version-Concurrency-Control" class="headerlink" title="多版本并发控制 (Multi-Version Concurrency Control)"></a>多版本并发控制 (Multi-Version Concurrency Control)</h4><p>MVCC 是一种并发控制机制，用于在多个并发事务同时读写数据库时保持数据的一致性和隔离性。它是通过在每个数据行上维护多个版本的数据来实现的。当一个事务要对数据库中的数据进行修改时，MVCC 会为该事务创建一个数据快照，而不是直接修改实际的数据行。</p>
+    <title>保证接口数据安全</title>
+    <url>/2023/09/08/%E4%BF%9D%E8%AF%81%E6%8E%A5%E5%8F%A3%E6%95%B0%E6%8D%AE%E5%AE%89%E5%85%A8/</url>
+    <content><![CDATA[<h4 id="Jdk-实现数据加密"><a href="#Jdk-实现数据加密" class="headerlink" title="Jdk 实现数据加密"></a>Jdk 实现数据加密</h4><blockquote>
+<p>业务需求: 主系统开放接口 &#x3D;&gt; 子系统给主系统推送结算数据 &#x3D;&gt; 主系统用推送的结算数据设计报表</p>
+</blockquote>
+<p>对称加密（Des，Triple Des，AES）<br>采用单钥密码系统的加密方法，同一个密钥可以同时用作信息的加密和解密，这种加密方法称为对称加密，也称为单密钥加密。常用的单向加密算法：</p>
+<ul>
+<li>DES（Data Encryption Standard）：数据加密标准，速度较快，适用于加密大量数据的场合；</li>
+<li>3DES（Triple DES）：是基于DES，对一块数据用三个不同的密钥进行三次加密，强度更高；</li>
+<li>AES（Advanced Encryption Standard）：高级加密标准，是下一代的加密算法标准，速度快，安全级别高，支持128、192、256位密钥的加密；</li>
+</ul>
 <blockquote>
-<p>MVCC 机制只有在 PR、PC下兼容，其他隔离界别下没有</p>
+<p>导入 bcprov 包</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.bouncycastle&lt;/groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;bcprov-jdk15on&lt;/artifactId&gt;</span><br><span class="line">    &lt;version&gt;1.70&lt;/version&gt;</span><br><span class="line">&lt;/dependency&gt;</span><br></pre></td></tr></table></figure>
+
+<h5 id="对称加密的简单实现"><a href="#对称加密的简单实现" class="headerlink" title="对称加密的简单实现"></a>对称加密的简单实现</h5><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">public class Test &#123;</span><br><span class="line">    public static void main(String[] args) &#123;</span><br><span class="line">        String text = &quot;你好世界！！&quot;;</span><br><span class="line"></span><br><span class="line">        String key = &quot;12345678&quot;;//des必须8字节</span><br><span class="line">        // 算法/模式/填充  默认 DES/ECB/PKCS5Padding</span><br><span class="line">        String transformation = &quot;DES&quot;;</span><br><span class="line"></span><br><span class="line">        String key1 = &quot;1234567812345678&quot;;//aes必须16字节</span><br><span class="line">        String transformation1 = &quot;AES&quot;;</span><br><span class="line"></span><br><span class="line">        String key2 = &quot;123456781234567812345678&quot;;//TripleDES使用24字节的key</span><br><span class="line">        String transformation2 = &quot;TripleDes&quot;;</span><br><span class="line"></span><br><span class="line">        String extracted = extracted(text, key, transformation, true);</span><br><span class="line">        System.out.println(&quot;DES加密：&quot; + extracted);</span><br><span class="line">        String extracted1 = extracted(extracted, key, transformation, false);</span><br><span class="line">        System.out.println(&quot;解密：&quot; + extracted1);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">        String extracted2 = extracted(text, key1, transformation1, true);</span><br><span class="line">        System.out.println(&quot;AES加密：&quot; + extracted2);</span><br><span class="line">        String extracted3 = extracted(extracted2, key1, transformation1, false);</span><br><span class="line">        System.out.println(&quot;解密：&quot; + extracted3);</span><br><span class="line"></span><br><span class="line">        String extracted4 = extracted(text, key2, transformation2, true);</span><br><span class="line">        System.out.println(&quot;Triple Des加密：&quot; + extracted4);</span><br><span class="line">        String extracted5 = extracted(extracted, key2, transformation2, false);</span><br><span class="line">        System.out.println(&quot;解密：&quot; + extracted5);</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * @param text           明文/base64密文</span><br><span class="line">     * @param key            密钥</span><br><span class="line">     * @param transformation 转换方式</span><br><span class="line">     * @param mode           加密/解密</span><br><span class="line">     */</span><br><span class="line">    private static String extracted(String text, String key, String transformation, boolean mode)&#123;</span><br><span class="line">        Cipher cipher = null;</span><br><span class="line">        try &#123;</span><br><span class="line">            cipher = Cipher.getInstance(transformation);</span><br><span class="line">            // key 与给定的密钥内容相关联的密钥算法的名称</span><br><span class="line">            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), transformation);</span><br><span class="line">            //Cipher 的操作模式,加密模式：ENCRYPT_MODE、 解密模式：DECRYPT_MODE、包装模式：WRAP_MODE 或 解包装：UNWRAP_MODE）</span><br><span class="line">            cipher.init(mode ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKeySpec);</span><br><span class="line">            byte[] bytes = cipher.doFinal(mode ? text.getBytes(StandardCharsets.UTF_8) : Base64.decode(text));</span><br><span class="line">            return mode ? Base64.encode(bytes) : new String(bytes);</span><br><span class="line">        &#125; catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>DES加密：j+tPzTH7ttEeK+FrJaLY8OwmOezdN8hF<br>解密：你好世界！！<br>AES加密：&#x2F;+cq03JhyvrTIJyYvWwc2Dc&#x2F;bFUBNKelKPSANnWgsAw&#x3D;<br>解密：你好世界！！<br>Triple Des加密：j+tPzTH7ttEeK+FrJaLY8OwmOezdN8hF<br>解密：你好世界！！</p>
+</blockquote>
+<h5 id="非对称加密的简单实现"><a href="#非对称加密的简单实现" class="headerlink" title="非对称加密的简单实现"></a>非对称加密的简单实现</h5><blockquote>
+<p>公钥加密，也叫非对称（密钥）加密（public key encryption），属于通信科技下的网络安全二级学科，指的是由对应的一对唯一性密钥（即公开密钥和私有密钥）组成的加密方法。它解决了密钥的发布和管理问题，是商业密码的核心。在公钥加密体制中，没有公开的是私钥，公开的是公钥。常用的算法：</p>
+</blockquote>
+<p>RSA、ElGamal、背包算法、Rabin(Rabin的加密法可以说是RSA方法的特例)、Diffie-Hellman (D-H) 密钥交换协议中的公钥加密算法、Elliptic Curve Cryptography（ECC,椭圆曲线加密算法）。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">public class UnSymmetryTest &#123;</span><br><span class="line">    public static void main(String[] args) throws Exception &#123;</span><br><span class="line"></span><br><span class="line">        String text = &quot;===你好世界===&quot;;</span><br><span class="line">        String algorithm = &quot;RSA&quot;;</span><br><span class="line"></span><br><span class="line">        PublicKey publicKey = getPublicKey(algorithm, &quot;/Users/a201/Downloads/publicKey.txt&quot;);</span><br><span class="line">        PrivateKey privateKey = getPrivateKey(algorithm, &quot;/Users/a201/Downloads/privateKey.txt&quot;);</span><br><span class="line"></span><br><span class="line">        String s = RSAEncrypt(text, algorithm, publicKey);</span><br><span class="line">        String s1 = RSADecrypt(s, algorithm, privateKey);</span><br><span class="line"></span><br><span class="line">        System.out.println(s);</span><br><span class="line">        System.out.println(s1);</span><br><span class="line"></span><br><span class="line">//        generateKeyFile(&quot;RSA&quot;,&quot;/Users/a201/Downloads/privateKey.txt&quot;,&quot;/Users/a201/Downloads/publicKey.txt&quot;);</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 获取公钥,key</span><br><span class="line">     * @param algorithm  算法</span><br><span class="line">     * @param publicPath 密匙文件路径</span><br><span class="line">     * @return</span><br><span class="line">     */</span><br><span class="line">    private static PublicKey getPublicKey(String algorithm, String publicPath) throws IOException, NoSuchAlgorithmException, Base64DecodingException, InvalidKeySpecException &#123;</span><br><span class="line">        String publicEncodeString = FileUtils.readFileToString(new File(publicPath), StandardCharsets.UTF_8);</span><br><span class="line">        //返回转换指定算法的 public/private 关键字的 KeyFactory 对象。</span><br><span class="line">        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);</span><br><span class="line">        //此类表示根据 ASN.1 类型 SubjectPublicKeyInfo 进行编码的公用密钥的 ASN.1 编码</span><br><span class="line">        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(Base64.decode(publicEncodeString));</span><br><span class="line">        return keyFactory.generatePublic(x509EncodedKeySpec);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 获取私钥，key</span><br><span class="line">     * @param algorithm   算法</span><br><span class="line">     * @param privatePath 密匙文件路径</span><br><span class="line">     * @return</span><br><span class="line">     */</span><br><span class="line">    private static PrivateKey getPrivateKey(String algorithm, String privatePath) throws IOException, NoSuchAlgorithmException, Base64DecodingException, InvalidKeySpecException &#123;</span><br><span class="line">        String privateEncodeString = FileUtils.readFileToString(new File(privatePath), StandardCharsets.UTF_8);</span><br><span class="line">        //返回转换指定算法的 public/private 关键字的 KeyFactory 对象。</span><br><span class="line">        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);</span><br><span class="line">        //创建私钥key的规则  此类表示按照 ASN.1 类型 PrivateKeyInfo 进行编码的专用密钥的 ASN.1 编码</span><br><span class="line">        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(Base64.decode(privateEncodeString));</span><br><span class="line">        //私钥对象</span><br><span class="line">        return keyFactory.generatePrivate(pkcs8EncodedKeySpec);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 加密</span><br><span class="line">     * @param text      明文</span><br><span class="line">     * @param algorithm 算法</span><br><span class="line">     * @param key       私钥/密钥</span><br><span class="line">     * @return 密文</span><br><span class="line">     */</span><br><span class="line">    private static String RSAEncrypt(String text, String algorithm, Key key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchProviderException &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(algorithm);</span><br><span class="line">        cipher.init(Cipher.ENCRYPT_MODE, key);</span><br><span class="line">        byte[] bytes = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));</span><br><span class="line">        return Base64.encode(bytes);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 解密</span><br><span class="line">     * @param extracted 密文</span><br><span class="line">     * @param algorithm 算法</span><br><span class="line">     * @param key       密钥/私钥</span><br><span class="line">     * @return String 明文</span><br><span class="line">     */</span><br><span class="line">    private static String RSADecrypt(String extracted, String algorithm, Key key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, Base64DecodingException, NoSuchProviderException &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(algorithm);</span><br><span class="line">        cipher.init(Cipher.DECRYPT_MODE, key);</span><br><span class="line">        byte[] bytes1 = cipher.doFinal(Base64.decode(extracted));</span><br><span class="line">        return new String(bytes1);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 生成公钥和私钥文件</span><br><span class="line">     * @param algorithm   算法</span><br><span class="line">     * @param privatePath 私钥路径</span><br><span class="line">     * @param publicPath  公钥路径</span><br><span class="line">     */</span><br><span class="line">    private static void generateKeyFile(String algorithm, String privatePath, String publicPath) throws NoSuchAlgorithmException, IOException &#123;</span><br><span class="line">        //返回生成指定算法的 public/private 密钥对的 KeyPairGenerator 对象</span><br><span class="line">        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);</span><br><span class="line">        //生成一个密钥对</span><br><span class="line">        KeyPair keyPair = keyPairGenerator.generateKeyPair();</span><br><span class="line">        //私钥</span><br><span class="line">        PrivateKey privateKey = keyPair.getPrivate();</span><br><span class="line">        //公钥</span><br><span class="line">        PublicKey publicKey = keyPair.getPublic();</span><br><span class="line"></span><br><span class="line">        byte[] privateKeyEncoded = privateKey.getEncoded();</span><br><span class="line">        byte[] publicKeyEncoded = publicKey.getEncoded();</span><br><span class="line"></span><br><span class="line">        String privateEncodeString = Base64.encode(privateKeyEncoded);</span><br><span class="line">        String publicEncodeString = Base64.encode(publicKeyEncoded);</span><br><span class="line">        //需导入commons-io</span><br><span class="line">        FileUtils.writeStringToFile(new File(privatePath), privateEncodeString, StandardCharsets.UTF_8);</span><br><span class="line">        FileUtils.writeStringToFile(new File(publicPath), publicEncodeString, StandardCharsets.UTF_8);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="非对称解密的简单实现"><a href="#非对称解密的简单实现" class="headerlink" title="非对称解密的简单实现"></a>非对称解密的简单实现</h5><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">public class HybridEncryptionTest &#123;</span><br><span class="line"></span><br><span class="line">    public static void main(String[] args) &#123;</span><br><span class="line">        // 测试数据</span><br><span class="line">        String text = &quot;[&#123;\&quot;account_set_code\&quot;:\&quot;GSTHXCXGJJGYXGS\&quot;,\&quot;account_set_name\&quot;:\&quot;甘肃通汇鑫成型钢筋加工有限公司\&quot;,\&quot;amount\&quot;:-8019030.45,\&quot;audit_status\&quot;:\&quot;new\&quot;,\&quot;create_time\&quot;:1675928668000,\&quot;creator_name\&quot;:\&quot;系统管理员\&quot;,\&quot;customer\&quot;:\&quot;甘肃通汇鑫成型钢筋加工有限公司\&quot;,\&quot;customer_code\&quot;:\&quot;GSTHXCXGJJGYXGS\&quot;,\&quot;fee_code\&quot;:\&quot;HTJC\&quot;,\&quot;fee_name\&quot;:\&quot;合同价差\&quot;,\&quot;fee_no\&quot;:\&quot;CGFYD00015\&quot;,\&quot;fee_type\&quot;:\&quot;other_fee\&quot;,\&quot;invoice_type\&quot;:\&quot;增值税专用发票（0.13）\&quot;,\&quot;op_type\&quot;:\&quot;update\&quot;,\&quot;order_source\&quot;:\&quot;ERP-GSTHXCXGJJGYXGS\&quot;,\&quot;original_remark\&quot;:\&quot;\&quot;,\&quot;receipt_or_pay\&quot;:\&quot;receipt\&quot;,\&quot;settle_customer\&quot;:\&quot;甘肃通汇鑫成型钢筋加工有限公司\&quot;,\&quot;settle_customer_code\&quot;:\&quot;GSTHXCXGJJGYXGS\&quot;,\&quot;settle_mode\&quot;:\&quot;内部转账\&quot;,\&quot;tax_rate\&quot;:13.00,\&quot;time_stamp\&quot;:\&quot;1675931247605\&quot;,\&quot;unit_price\&quot;:5000&#125;]&quot;;</span><br><span class="line">        System.out.println(&quot;原始数据: &quot;+text+&#x27;\n&#x27;);</span><br><span class="line"></span><br><span class="line">        // 算法</span><br><span class="line">        String transformation = &quot;AES&quot;;</span><br><span class="line">        // 随机密钥</span><br><span class="line">        String randomKey = extracted(transformation);</span><br><span class="line">        System.out.println(&quot;AES随机key: &quot;+randomKey+&#x27;\n&#x27;);</span><br><span class="line"></span><br><span class="line">        // 使用随机 key 对数据 对称加密</span><br><span class="line">        String symmetryData = extracted(text, randomKey, transformation, true);</span><br><span class="line">        System.out.println(&quot;AES加密：&quot; + symmetryData+&#x27;\n&#x27;);</span><br><span class="line">        String extracted3 = extracted(symmetryData, randomKey, transformation, false);</span><br><span class="line">        System.out.println(&quot;AES解密：&quot; + extracted3+&#x27;\n&#x27;);</span><br><span class="line"></span><br><span class="line">        PublicKey rsa = null;</span><br><span class="line">        try &#123;</span><br><span class="line">            // 公钥应提前由接收方生成给发送方</span><br><span class="line">            rsa = getPublicKey(&quot;RSA&quot;, &quot;/Users/a201/Downloads/publicKey.txt&quot;);</span><br><span class="line">        &#125; catch (IOException | NoSuchAlgorithmException | Base64DecodingException | InvalidKeySpecException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line">        // 对随机 key 使用非对称加密</span><br><span class="line"></span><br><span class="line">        String rsaKey = &quot;&quot;;</span><br><span class="line">        try &#123;</span><br><span class="line">            rsaKey = RSAEncrypt(randomKey, &quot;RSA&quot;, rsa);</span><br><span class="line">            System.out.println(&quot;RSA加密后:&quot; + rsaKey+&#x27;\n&#x27;);</span><br><span class="line">        &#125; catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |</span><br><span class="line">                 BadPaddingException | NoSuchProviderException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">        PrivateKey privateKey = null;</span><br><span class="line">        // 解密</span><br><span class="line">        // 1、使用RSA解密 key</span><br><span class="line">        try &#123;</span><br><span class="line">            privateKey = getPrivateKey(&quot;RSA&quot;, &quot;/Users/a201/Downloads/privateKey.txt&quot;);</span><br><span class="line">        &#125; catch (IOException | NoSuchAlgorithmException | Base64DecodingException | InvalidKeySpecException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 获取解密后的  randomKey</span><br><span class="line">        String unRsaKey = &quot;&quot;;</span><br><span class="line">        try &#123;</span><br><span class="line">            unRsaKey = RSADecrypt(rsaKey, &quot;RSA&quot;, privateKey);</span><br><span class="line">            System.out.println(&quot;RSA解密后:&quot; + unRsaKey +&#x27;\n&#x27;);</span><br><span class="line">        &#125; catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |</span><br><span class="line">                 BadPaddingException | Base64DecodingException | NoSuchProviderException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        // 2、使用 解密后的 key 对对称加密数据解密</span><br><span class="line">        String originalData = extracted(symmetryData, unRsaKey, transformation, false);</span><br><span class="line">        System.out.println(&quot;AES解密后的原始数据:&quot; + originalData+&#x27;\n&#x27;);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 生成随机的AES密钥</span><br><span class="line">     * @param transformation 加密算法</span><br><span class="line">     * @return</span><br><span class="line">     */</span><br><span class="line">    private static String extracted(String transformation)&#123;</span><br><span class="line">        // 生成随机的AES密钥</span><br><span class="line">        KeyGenerator aesKeyGen = null;</span><br><span class="line">        try &#123;</span><br><span class="line">            aesKeyGen = KeyGenerator.getInstance(transformation);</span><br><span class="line">        &#125; catch (NoSuchAlgorithmException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line">        aesKeyGen.init(128);</span><br><span class="line">        SecretKey aesKey = aesKeyGen.generateKey();</span><br><span class="line">        return Base64.encode(aesKey.getEncoded());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     *  对称加密</span><br><span class="line">     * @param text           明文/base64密文</span><br><span class="line">     * @param key            密钥</span><br><span class="line">     * @param transformation 转换方式</span><br><span class="line">     * @param mode           加密/解密</span><br><span class="line">     */</span><br><span class="line">    private static String extracted(String text, String key, String transformation, boolean mode)&#123;</span><br><span class="line">        Cipher cipher = null;</span><br><span class="line">        try &#123;</span><br><span class="line">            cipher = Cipher.getInstance(transformation);</span><br><span class="line">            // key 与给定的密钥内容相关联的密钥算法的名称</span><br><span class="line">            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), transformation);</span><br><span class="line">            //Cipher 的操作模式,加密模式：ENCRYPT_MODE、 解密模式：DECRYPT_MODE、包装模式：WRAP_MODE 或 解包装：UNWRAP_MODE）</span><br><span class="line">            cipher.init(mode ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKeySpec);</span><br><span class="line">            byte[] bytes = cipher.doFinal(mode ? text.getBytes(StandardCharsets.UTF_8) : Base64.decode(text));</span><br><span class="line">            return mode ? Base64.encode(bytes) : new String(bytes);</span><br><span class="line">        &#125; catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException | InvalidKeyException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            throw new RuntimeException(e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 获取公钥,key</span><br><span class="line">     * @param algorithm  算法</span><br><span class="line">     * @param publicPath 密匙文件路径</span><br><span class="line">     * @return</span><br><span class="line">     */</span><br><span class="line">    private static PublicKey getPublicKey(String algorithm, String publicPath) throws IOException, NoSuchAlgorithmException, Base64DecodingException, InvalidKeySpecException &#123;</span><br><span class="line">        String publicEncodeString = FileUtils.readFileToString(new File(publicPath), StandardCharsets.UTF_8);</span><br><span class="line">        //返回转换指定算法的 public/private 关键字的 KeyFactory 对象。</span><br><span class="line">        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);</span><br><span class="line">        //此类表示根据 ASN.1 类型 SubjectPublicKeyInfo 进行编码的公用密钥的 ASN.1 编码</span><br><span class="line">        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(com.sun.org.apache.xml.internal.security.utils.Base64.decode(publicEncodeString));</span><br><span class="line">        return keyFactory.generatePublic(x509EncodedKeySpec);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 获取私钥，key</span><br><span class="line">     * @param algorithm   算法</span><br><span class="line">     * @param privatePath 密匙文件路径</span><br><span class="line">     * @return</span><br><span class="line">     */</span><br><span class="line">    private static PrivateKey getPrivateKey(String algorithm, String privatePath) throws IOException, NoSuchAlgorithmException, Base64DecodingException, InvalidKeySpecException &#123;</span><br><span class="line">        String privateEncodeString = FileUtils.readFileToString(new File(privatePath), StandardCharsets.UTF_8);</span><br><span class="line">        //返回转换指定算法的 public/private 关键字的 KeyFactory 对象。</span><br><span class="line">        KeyFactory keyFactory = KeyFactory.getInstance(algorithm);</span><br><span class="line">        //创建私钥key的规则  此类表示按照 ASN.1 类型 PrivateKeyInfo 进行编码的专用密钥的 ASN.1 编码</span><br><span class="line">        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(com.sun.org.apache.xml.internal.security.utils.Base64.decode(privateEncodeString));</span><br><span class="line">        //私钥对象</span><br><span class="line">        return keyFactory.generatePrivate(pkcs8EncodedKeySpec);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 非对称加密</span><br><span class="line">     * @param text      明文</span><br><span class="line">     * @param algorithm 算法</span><br><span class="line">     * @param key       私钥/密钥</span><br><span class="line">     * @return 密文</span><br><span class="line">     */</span><br><span class="line">    private static String RSAEncrypt(String text, String algorithm, Key key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchProviderException &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(algorithm);</span><br><span class="line">        cipher.init(Cipher.ENCRYPT_MODE, key);</span><br><span class="line">        byte[] bytes = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));</span><br><span class="line">        return com.sun.org.apache.xml.internal.security.utils.Base64.encode(bytes);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    /**</span><br><span class="line">     * 非对称解密</span><br><span class="line">     * @param extracted 密文</span><br><span class="line">     * @param algorithm 算法</span><br><span class="line">     * @param key       密钥/私钥</span><br><span class="line">     * @return String 明文</span><br><span class="line">     */</span><br><span class="line">    private static String RSADecrypt(String extracted, String algorithm, Key key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, Base64DecodingException, NoSuchProviderException &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(algorithm);</span><br><span class="line">        cipher.init(Cipher.DECRYPT_MODE, key);</span><br><span class="line">        byte[] bytes1 = cipher.doFinal(com.sun.org.apache.xml.internal.security.utils.Base64.decode(extracted));</span><br><span class="line">        return new String(bytes1);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="打印的数据"><a href="#打印的数据" class="headerlink" title="打印的数据"></a>打印的数据</h5><blockquote>
+<p>原始数据:   [{“account_set_code”:”GSTHXCXGJJGYXGS”,”account_set_name”:”甘肃通汇鑫成型钢筋加工有限公司”,”amount”:-8019030.45,”audit_status”:”new”,”create_time”:1675928668000,”creator_name”:”系统管理员”,”customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”customer_code”:”GSTHXCXGJJGYXGS”,”fee_code”:”HTJC”,”fee_name”:”合同价差”,”fee_no”:”CGFYD00015”,”fee_type”:”other_fee”,”invoice_type”:”增值税专用发票（0.13）”,”op_type”:”update”,”order_source”:”ERP-GSTHXCXGJJGYXGS”,”original_remark”:””,”receipt_or_pay”:”receipt”,”settle_customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”settle_customer_code”:”GSTHXCXGJJGYXGS”,”settle_mode”:”内部转账”,”tax_rate”:13.00,”time_stamp”:”1675931247605”,”unit_price”:5000}]</p>
+</blockquote>
+<blockquote>
+<p>AES随机key: K3wLrOsjDKamI27s93g+Pw&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>AES加密：so&#x2F;QnwwVVr0pIiuZBzI24Yew&#x2F;fxhvtIZmwCCrugbFo+VqROocE2TU0OciHRlJ50BWIfa&#x2F;4spl15l7GLAxuPTgIg1jSeWC&#x2F;NlCUskh+Xl76SEzR4T0wNYiZI7a1FtFSCP5sJHsZNCiQK3jw3oM2ytIBbFzh7N3sVQdQK&#x2F;CnAiUCx0swEM+dNTyS8JFsGoighmf6JIEqtQkd3Gjqs3TbC1QODH5sXjT0Z7R&#x2F;aI6IBzzvtn0O06kAVdsntkM2TX1eNWXYeivITprZJSFJFySPQtm2ILxuRhAHwSCd0QyHW5YZcPRsJT3tz9kRGDOE5cGcPf6UV3VPQ8N1cz&#x2F;9A1PeAt86V5XrKKhw90AZ4jL8dTG4uITKtVGyA6Ecasx6NI3zs5Qg0ofY9mYEehORB1TOdtn2kbZCvvqX0gP7jy1NqCFKf&#x2F;gp4x1dKij7CM87WI+pY+gQDjZ3gU64+NZrFuyHwvlEymxuHNUwjQonkNlKg5RtqKWCqAzeWFxm8sKEyB&#x2F;xrhM+&#x2F;4IdBUBstBN0IcIOmiVl0uS51py5U9QbbDtq5QwZwGgaMGX1yPikNpSgLnVWWGdZR398rtobw0Qwo1WP5bHAjp&#x2F;MhViTZCr6JJdolvgdxBu0ymA8mrIu+hHc30mlnjDmYjsAmJMqG72xzV6Pf+gOgHbEj6xx3YsiJWJvPb3kMhsm28Nav3LjAp98E4n1im3YEI6lktKA3t&#x2F;hFB5&#x2F;QZpQECM&#x2F;do87ya0YkFtXVoUS45qMz2EZD8xjO4AtAQiWqfcTRacfVcyT9w7IZWZg6MQM5XVJs6wLoLEg&#x2F;go++XS3iJ6W6fwLU8pweMxI&#x2F;w6+uv7tXnG3R&#x2F;v2QYZOe3OC0Cglhyunm0437l0hmhLq&#x2F;6kGCgxp6GRH9vKiVBQDQUmVknUrHLMlT9WAz5DPDLxfBmOtiemCpT5hd1Qc5YXtuv2ltesX9lys9QxiwDezkaP9gr7rqK48HTUey7ThTJqEwt&#x2F;yTkoeDDMnT0dWN5nEo3f14&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>AES解密：[{“account_set_code”:”GSTHXCXGJJGYXGS”,”account_set_name”:”甘肃通汇鑫成型钢筋加工有限公司”,”amount”:-8019030.45,”audit_status”:”new”,”create_time”:1675928668000,”creator_name”:”系统管理员”,”customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”customer_code”:”GSTHXCXGJJGYXGS”,”fee_code”:”HTJC”,”fee_name”:”合同价差”,”fee_no”:”CGFYD00015”,”fee_type”:”other_fee”,”invoice_type”:”增值税专用发票（0.13）”,”op_type”:”update”,”order_source”:”ERP-GSTHXCXGJJGYXGS”,”original_remark”:””,”receipt_or_pay”:”receipt”,”settle_customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”settle_customer_code”:”GSTHXCXGJJGYXGS”,”settle_mode”:”内部转账”,”tax_rate”:13.00,”time_stamp”:”1675931247605”,”unit_price”:5000}]</p>
+</blockquote>
+<blockquote>
+<p>RSA加密后:Xx+wR6dDKiSPWjmLHKQxb14Brw62V7XtJKqTA1QREm5sttwKFFqNvlkCt5lvYb4uHCTfkxVhn89R<br>iLiQORnQgkDNTAZLCgMsiv+cLhQrNLp05mBvWGF&#x2F;CdMeFsomlCDrxaqPsdV6HKLYM4Meyl5K02mW<br>QTBWnHL7txsff5rdr+BgfxOz+i6VsFGhAcWsD70LAtNIjRHYOT+AKSCNTEcp9rLhcqBYfemwWCgd<br>bE0fCqje2PYAg&#x2F;BTAuzhSPNbLCTT9KlTFTNO0T9dI+v1kSMYK5vs0MnEqx&#x2F;akqbweEl6jeMIEWcK<br>2vMs7z9J6N&#x2F;TyyWPlb4yFnsss9f6HtWgveyUEA&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>RSA解密后:K3wLrOsjDKamI27s93g+Pw&#x3D;&#x3D;</p>
+</blockquote>
+<blockquote>
+<p>AES解密后的原始数据:[{“account_set_code”:”GSTHXCXGJJGYXGS”,”account_set_name”:”甘肃通汇鑫成型钢筋加工有限公司”,”amount”:-8019030.45,”audit_status”:”new”,”create_time”:1675928668000,”creator_name”:”系统管理员”,”customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”customer_code”:”GSTHXCXGJJGYXGS”,”fee_code”:”HTJC”,”fee_name”:”合同价差”,”fee_no”:”CGFYD00015”,”fee_type”:”other_fee”,”invoice_type”:”增值税专用发票（0.13）”,”op_type”:”update”,”order_source”:”ERP-GSTHXCXGJJGYXGS”,”original_remark”:””,”receipt_or_pay”:”receipt”,”settle_customer”:”甘肃通汇鑫成型钢筋加工有限公司”,”settle_customer_code”:”GSTHXCXGJJGYXGS”,”settle_mode”:”内部转账”,”tax_rate”:13.00,”time_stamp”:”1675931247605”,”unit_price”:5000}]</p>
 </blockquote>
 <hr>
-<h5 id="InnoDB-对-MVCC-的实现"><a href="#InnoDB-对-MVCC-的实现" class="headerlink" title="InnoDB 对 MVCC 的实现"></a>InnoDB 对 MVCC 的实现</h5><p>MVCC 的实现依赖于：隐藏字段、Read View、undo log。在内部实现中，InnoDB 通过数据行的 DB_TRX_ID 和 Read View 来判断数据的可见性，如不可见，则通过数据行的 DB_ROLL_PTR 找到 undo log 中的历史版本。每个事务读到的数据版本可能是不一样的，在同一个事务中，用户只能看到该事务创建 Read View 之前已经提交的修改和该事务本身做的修改</p>
-<h5 id="Innodb隐藏字段"><a href="#Innodb隐藏字段" class="headerlink" title="Innodb隐藏字段"></a>Innodb隐藏字段</h5><ol>
-<li><p>DB_ROW_ID<br>行标识（隐藏单调自增 ID），大小为 6 字节，如果表没有主键，InnoDB 会自动生成一个隐藏主键，因此会出现这个列。如果没有设置主键且该表没有唯一非空索引时，InnoDB 会使用该 id 来生成聚簇索引</p>
-</li>
-<li><p>DB_TRX_ID（最近一次提交事务的ID）：修改表数据时，都会提交事务，每个事务都有一个唯一的ID，这个字段就记录了最近一次提交事务的ID。另外，每条记录的头信息（record header）里都有一个专门的 bit（deleted_flag）来表示当前记录是否已经被删除。</p>
-</li>
-<li><p>DB_ROLL_PTR（上个版本的地址）：修改表数据时，旧版本的数据都会被记录到Undo Log日志中，每个版本的数据都有一个版本地址，这个字段记录的就是上个版本的地址。（回滚指针，指向该行的 undo log 。如果该行未被更新，则为空）</p>
-</li>
-</ol>
-<h5 id="read-view"><a href="#read-view" class="headerlink" title="read view"></a>read view</h5><blockquote>
-<p>在 read committed 和 read repeatable 隔离级别下，MVCC 采用read view 来实现的，它们的区别在于创建 read view 时机不同：<br>Read View 主要是用来做可见性判断，里面保存了 “当前对本事务不可见的其他活跃事务”</p>
-</blockquote>
-<h5 id="主要有以下字段："><a href="#主要有以下字段：" class="headerlink" title="主要有以下字段："></a>主要有以下字段：</h5><ul>
-<li>m_low_limit_id：目前出现过的最大的事务 ID+1，即下一个将被分配的事务 ID。大于等于这个 ID 的数据版本均不可见</li>
-<li>m_up_limit_id：活跃事务列表 m_ids 中最小的事务 ID，如果 m_ids 为空，则 m_up_limit_id 为 m_low_limit_id。小于这个 ID 的数据版本均可见</li>
-<li>m_ids：Read View 创建时其他未提交的活跃事务 ID 列表。创建 Read View时，将当前未提交事务 ID 记录下来，后续即使它们修改了记录行的值，对于当前事务也是不可见的。m_ids 不包括当前事务自己和已提交的事务（正在内存中）</li>
-<li>m_creator_trx_id：创建该 Read View 的事务 ID</li>
-</ul>
-<h5 id="事务可见性示意图"><a href="#事务可见性示意图" class="headerlink" title="事务可见性示意图"></a>事务可见性示意图</h5><p><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/read-view-visibility.png" alt="事务可见性示意图"></p>
-<h5 id="undo-log"><a href="#undo-log" class="headerlink" title="undo-log"></a>undo-log</h5><blockquote>
-<p>undo log 主要有两个作用：</p>
-</blockquote>
-<p>当事务回滚时用于将数据恢复到修改前的样子<br>另一个作用是 MVCC ，当读取记录时，若该记录被其他事务占用或当前版本对该事务不可见，则可以通过 undo log 读取之前的版本数据，以此实现非锁定读</p>
-<h5 id="在-InnoDB-存储引擎中-undo-log-分为两种：insert-undo-log-和-update-undo-log："><a href="#在-InnoDB-存储引擎中-undo-log-分为两种：insert-undo-log-和-update-undo-log：" class="headerlink" title="在 InnoDB 存储引擎中 undo log 分为两种：insert undo log 和 update undo log："></a>在 InnoDB 存储引擎中 undo log 分为两种：insert undo log 和 update undo log：</h5><ol>
-<li><p>insert undo log：指在 insert 操作中产生的 undo log。因为 insert 操作的记录只对事务本身可见，对其他事务不可见，故该 undo log 可以在事务提交后直接删除。不需要进行 purge 操作<br>insert 时的数据初始状态：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/mvcc_1.png" alt="mvcc_1"></p>
-</li>
-<li><p>update undo log：update 或 delete 操作中产生的 undo log。该 undo log可能需要提供 MVCC 机制，因此不能在事务提交时就进行删除。提交时放入 undo log 链表，等待 purge线程 进行最后的删除</p>
-</li>
-</ol>
-<h5 id="数据第一次被修改时："><a href="#数据第一次被修改时：" class="headerlink" title="数据第一次被修改时："></a>数据第一次被修改时：</h5><p><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_2.png" alt="mvcc_2"></p>
-<h5 id="数据第二次被修改时："><a href="#数据第二次被修改时：" class="headerlink" title="数据第二次被修改时："></a>数据第二次被修改时：</h5><p><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_3.png" alt="mvcc_3"></p>
-<p>不同事务或者相同事务的对同一记录行的修改，会使该记录行的 undo log 成为一条链表，链首就是最新的记录，链尾就是最早的旧记录。</p>
-<h5 id="数据可见性算法"><a href="#数据可见性算法" class="headerlink" title="数据可见性算法"></a>数据可见性算法</h5><p>在 InnoDB 存储引擎中，创建一个新事务后，执行每个 select 语句前，都会创建一个快照（Read View），<strong>快照中保存了当前数据库系统中正处于活跃（没有 commit）的事务的 ID 号</strong>。其实简单的说保存的是系统中当前不应该被本事务看到的其他事务 ID 列表（即 m_ids）。当用户在这个事务中要读取某个记录行的时候，InnoDB 会将该记录行的 DB_TRX_ID 与 Read View 中的一些变量及当前事务 ID 进行比较，判断是否满足可见性条件</p>
-<p>具体的比较算法如下(图源)：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_4.png" alt="mvcc_4"></p>
-<ol>
-<li><p>如果记录 DB_TRX_ID &lt; m_up_limit_id，那么表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照之前就提交了，所以该记录行的值对当前事务是可见的</p>
-</li>
-<li><p>如果 DB_TRX_ID &gt;&#x3D; m_low_limit_id，那么表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照之后才修改该行，所以该记录行的值对当前事务不可见。跳到步骤 5</p>
-</li>
-<li><p>m_ids 为空，则表明在当前事务创建快照之前，修改该行的事务就已经提交了，所以该记录行的值对当前事务是可见的</p>
-</li>
-<li><p>如果 m_up_limit_id &lt;&#x3D; DB_TRX_ID &lt; m_low_limit_id，表明最新修改该行的事务（DB_TRX_ID）在当前事务创建快照的时候可能处于“活动状态”或者“已提交状态”；所以就要对活跃事务列表 m_ids 进行查找（源码中是用的二分查找，因为是有序的）</p>
-</li>
-<li><p>如果在活跃事务列表 m_ids 中能找到 DB_TRX_ID，表明：① 在当前事务创建快照前，该记录行的值被事务 ID 为 DB_TRX_ID 的事务修改了，但没有提交；或者 ② 在当前事务创建快照后，该记录行的值被事务 ID 为 DB_TRX_ID 的事务修改了。这些情况下，这个记录行的值对当前事务都是不可见的。跳到步骤 5</p>
-</li>
-<li><p>在活跃事务列表中找不到，则表明“id 为 trx_id 的事务”在修改“该记录行的值”后，在“当前事务”创建快照前就已经提交了，所以记录行对当前事务可见</p>
-</li>
-<li><p>在该记录行的 DB_ROLL_PTR 指针所指向的 undo log 取出快照记录，用快照记录的 DB_TRX_ID 跳到步骤 1 重新开始判断，直到找到满足的快照版本或返回空</p>
-</li>
-</ol>
-<h5 id="RC-和-RR-隔离级别下-MVCC-的差异"><a href="#RC-和-RR-隔离级别下-MVCC-的差异" class="headerlink" title="RC 和 RR 隔离级别下 MVCC 的差异"></a>RC 和 RR 隔离级别下 MVCC 的差异</h5><p>在事务隔离级别 RC 和 RR （InnoDB 存储引擎的默认事务隔离级别）下，InnoDB 存储引擎使用 MVCC（非锁定一致性读），但它们生成 Read View 的时机却不同</p>
-<ul>
-<li>在 RC 隔离级别下的 每次select 查询前都生成一个Read View (m_ids 列表)</li>
-<li>在 RR 隔离级别下只在事务开始后 第一次select 数据前生成一个Read View（m_ids 列表）</li>
-</ul>
-<h5 id="MVCC-解决不可重复读问题"><a href="#MVCC-解决不可重复读问题" class="headerlink" title="MVCC 解决不可重复读问题"></a>MVCC 解决不可重复读问题</h5><p>虽然 RC 和 RR 都通过 MVCC 来读取快照数据，但由于 生成 Read View 时机不同，从而在 RR 级别下实现可重复读</p>
-<p>举个例子：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_5.png" alt="mvcc_5"></p>
-<h5 id="在-RC-下-ReadView-生成情况"><a href="#在-RC-下-ReadView-生成情况" class="headerlink" title="在 RC 下 ReadView 生成情况"></a>在 RC 下 ReadView 生成情况</h5><ol>
-<li>假设时间线来到 T4 ，那么此时数据行 id &#x3D; 1 的版本链为：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_6.png" alt="mvcc_6"></li>
-</ol>
-<p>由于 RC 级别下每次查询都会生成Read View ，并且事务 101、102 并未提交，此时 103 事务生成的 Read View 中活跃的事务 m_ids 为：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
-<ul>
-<li>此时最新记录的 DB_TRX_ID 为 101，m_up_limit_id &lt;&#x3D; 101 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</li>
-<li>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</li>
-<li>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</li>
-</ul>
-<ol start="2">
-<li>时间线来到 T6 ，数据的版本链为：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_7.png" alt="mvcc_7"></li>
-</ol>
-<p>因为在 RC 级别下，重新生成 Read View，这时事务 101 已经提交，102 并未提交，所以此时 Read View 中活跃的事务 m_ids：[102] ，m_low_limit_id为：104，m_up_limit_id为：102，m_creator_trx_id为：103</p>
-<ul>
-<li><p>此时最新记录的 DB_TRX_ID 为 102，m_up_limit_id &lt;&#x3D; 102 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</p>
-</li>
-<li><p>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 为 101，满足 101 &lt; m_up_limit_id，记录可见，所以在 T6 时间点查询到数据为 name &#x3D; 李四，与时间 T4 查询到的结果不一致，不可重复读！</p>
-</li>
-</ul>
-<ol start="3">
-<li>时间线来到 T9 ，数据的版本链为：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_8.png" alt="mvcc_8"></li>
-</ol>
-<p>重新生成 Read View， 这时事务 101 和 102 都已经提交，所以 m_ids 为空，则 m_up_limit_id &#x3D; m_low_limit_id &#x3D; 104，最新版本事务 ID 为 102，满足 102 &lt; m_low_limit_id，可见，查询结果为 name &#x3D; 赵六</p>
-<blockquote>
-<p>总结： 在 RC 隔离级别下，事务在每次查询开始时都会生成并设置新的 Read View，所以导致不可重复读</p>
-</blockquote>
-<h5 id="在-RR-下-ReadView-生成情况"><a href="#在-RR-下-ReadView-生成情况" class="headerlink" title="在 RR 下 ReadView 生成情况"></a>在 RR 下 ReadView 生成情况</h5><p>在可重复读级别下，只会在事务开始后第一次读取数据时生成一个 Read View（m_ids 列表）</p>
-<ol>
-<li>在 T4 情况下的版本链为：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_9.png" alt="mvcc_9"></li>
-</ol>
-<p>在当前执行 select 语句时生成一个 Read View，此时 m_ids：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
-<p>此时和 RC 级别下一样：</p>
-<ul>
-<li>最新记录的 DB_TRX_ID 为 101，m_up_limit_id &lt;&#x3D; 101 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</li>
-<li>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</li>
-<li>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</li>
-</ul>
-<ol start="2">
-<li>时间点 T6 情况下：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_10.png" alt="mvcc_10"></li>
-</ol>
-<p>在 RR 级别下只会生成一次Read View，所以此时依然沿用 m_ids：[101,102] ，m_low_limit_id为：104，m_up_limit_id为：101，m_creator_trx_id 为：103</p>
-<ul>
-<li><p>最新记录的 DB_TRX_ID 为 102，m_up_limit_id &lt;&#x3D; 102 &lt; m_low_limit_id，所以要在 m_ids 列表中查找，发现 DB_TRX_ID 存在列表中，那么这个记录不可见</p>
-</li>
-<li><p>根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 为 101，不可见</p>
-</li>
-<li><p>继续根据 DB_ROLL_PTR 找到 undo log 中的上一版本记录，上一条记录的 DB_TRX_ID 还是 101，不可见</p>
-</li>
-<li><p>继续找上一条 DB_TRX_ID为 1，满足 1 &lt; m_up_limit_id，可见，所以事务 103 查询到数据为 name &#x3D; 菜花</p>
-</li>
-</ul>
-<ol start="3">
-<li>时间点 T9 情况下：<br><img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" alt="mvcc_11"><!-- <img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" class="" title="mvcc_11"> -->
-<!-- <img src="/2023/11/23/MVCC%E6%9C%BA%E5%88%B6/MVCC_11.png" class="" title="[title]"> --></li>
-</ol>
-<p>此时情况跟 T6 完全一样，由于已经生成了 Read View，此时依然沿用 m_ids：[101,102] ，所以查询结果依然是 name &#x3D; 菜花</p>
-<h4 id="MVCC➕Next-key-Lock-防止幻读"><a href="#MVCC➕Next-key-Lock-防止幻读" class="headerlink" title="MVCC➕Next-key-Lock 防止幻读"></a>MVCC➕Next-key-Lock 防止幻读</h4><hr>
-<p>InnoDB存储引擎在 RR 级别下通过 MVCC和 Next-key Lock 来解决幻读问题<br>1、执行普通 select，此时会以 MVCC 快照读的方式读取数据</p>
-<p>在快照读的情况下，RR 隔离级别只会在事务开启后的第一次查询生成 Read View ，并使用至事务提交。所以在生成 Read View 之后其它事务所做的更新、插入记录版本对当前事务并不可见，实现了可重复读和防止快照读下的 “幻读”</p>
-<p>2、执行 select…for update&#x2F;lock in share mode、insert、update、delete 等当前读</p>
-<p>在当前读下，读取的都是最新的数据，如果其它事务有插入新的记录，并且刚好在当前事务查询范围内，就会产生幻读！InnoDB 使用 Next-key Lock 来防止这种情况。当执行当前读时，会锁定读取到的记录的同时，锁定它们的间隙，防止其它事务在查询范围内插入数据。只要我不让你插入，就不会发生幻读</p>
+<h5 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h5><p>[怎么设计大文件、大数据场景下的传输加密方案] <a href="https://www.cnblogs.com/xiaoxi-jinchen/p/17167910.html">https://www.cnblogs.com/xiaoxi-jinchen/p/17167910.html</a></p>
+<p>[保证接口数据安全的10种方式] <a href="https://juejin.cn/post/7116520783534522399">https://juejin.cn/post/7116520783534522399</a></p>
 ]]></content>
       <tags>
-        <tag>MySql</tag>
+        <tag>数据加密</tag>
       </tags>
   </entry>
   <entry>
