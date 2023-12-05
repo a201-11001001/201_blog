@@ -255,6 +255,7 @@
 ]]></content>
       <tags>
         <tag>数据加密</tag>
+        <tag>方案设计</tag>
       </tags>
   </entry>
   <entry>
@@ -287,8 +288,8 @@
 </ul>
 ]]></content>
       <tags>
+        <tag>方案设计</tag>
         <tag>序列化</tag>
-        <tag>思路学习</tag>
       </tags>
   </entry>
 </search>
