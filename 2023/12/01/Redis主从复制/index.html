@@ -1,0 +1,202 @@
+<!DOCTYPE html><html class="hide-aside" lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Redis主从复制 | 201_blog</title><meta name="author" content="201"><meta name="copyright" content="201"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="RabbitMQ避免消息不丢失">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis主从复制">
+<meta property="og:url" content="http://example.com/2023/12/01/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/index.html">
+<meta property="og:site_name" content="201_blog">
+<meta property="og:description" content="RabbitMQ避免消息不丢失">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/top_img/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6top_img.jpg">
+<meta property="article:published_time" content="2023-12-01T13:17:51.000Z">
+<meta property="article:modified_time" content="2023-12-07T07:17:41.146Z">
+<meta property="article:author" content="201">
+<meta property="article:tag" content="Redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/top_img/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6top_img.jpg"><link rel="shortcut icon" href="/avatar.jpg"><link rel="canonical" href="http://example.com/2023/12/01/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"languages":{"hits_empty":"找不到您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Redis主从复制',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: false,
+  postUpdate: '2023-12-07 15:17:41'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.3.0"></head><body><script>window.paceOptions = {
+  restartOnPushState: false
+}
+
+document.addEventListener('pjax:send', () => {
+  Pace.restart()
+})
+</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pace-js/themes/blue/pace-theme-minimal.min.css"/><script src="https://cdn.jsdelivr.net/npm/pace-js/pace.min.js"></script><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/avatar.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">7</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">8</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('/top_img/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6top_img.jpg')"><nav id="nav"><span id="blog-info"><a href="/" title="201_blog"><span class="site-name">201_blog</span></a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search" href="javascript:void(0);"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">Redis主从复制</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2023-12-01T13:17:51.000Z" title="发表于 2023-12-01 21:17:51">2023-12-01</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2023-12-07T07:17:41.146Z" title="更新于 2023-12-07 15:17:41">2023-12-07</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="Redis主从复制"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout hide-aside" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h4 id="Redis主从复制实现原理"><a href="#Redis主从复制实现原理" class="headerlink" title="Redis主从复制实现原理"></a>Redis主从复制实现原理</h4><p>主从复制，是指将一台Redis服务器的数据，复制到其他的Redis服务器。前者称为主节点(master)，后者称为从节点(slave)；数据的复制是单向的，只能由主节点到从节点。</p>
+<h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><ul>
+<li>数据冗余(由于从节点是主节点的副本，主节点数据的备份可以在从节点上实现)</li>
+<li>高可用性(通过将数据复制到多个从节点，即使主节点发生故障，从节点可替代主节点提供服务，从而保障系统的高可用性。)</li>
+<li>读写分离(主节点提供写服务,从节点提供读服务,分担主节点的负载,提高系统的整体性能)</li>
+</ul>
+<h5 id="主从复制原理"><a href="#主从复制原理" class="headerlink" title="主从复制原理"></a>主从复制原理</h5><blockquote>
+<ul>
+<li>从服务向主服务器发送 psync 命令,主服务器收到命令后在本地生成 RDB 文件 &#x3D;&#x3D;&gt; </li>
+<li>生成 RDB 文件的同时会在本地创建缓冲区(用来存储 RDB 文件存储过程写入的新的命令) &#x3D;&#x3D;&gt; </li>
+<li>将RDB 文件发送到从服务器 &#x3D;&#x3D;&gt; </li>
+<li>从服务器收到之后先将本地的 RDB 文件删除,然后将发送过来的 RDB 文件在本地恢复 &#x3D;&#x3D;&gt;</li>
+<li>主服务器发送缓冲区的命令 &#x3D;&#x3D;&gt; </li>
+<li>从服务器开始接收缓存区的命令写入本地</li>
+</ul>
+</blockquote>
+<p><img src="/2023/12/01/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86.png" alt="Redis主从复制"></p>
+<h5 id="全量复制"><a href="#全量复制" class="headerlink" title="全量复制"></a>全量复制</h5><p>全量复制是 Redis 最早支持的复制方式，触发全量复制的命令是 sync 和 psync。</p>
+<ul>
+<li>从服务发送 psync 命令进行数据同步，由于是第一次进行复制，从节点没有复制偏移量和主节点运行 id，所以发送 psync ？-1。</li>
+<li>主节点接收从节点的命令后，主节点根据 psync ? -1 解析出当前为全量复制，所以回复 +FULLRESYNC，同时也会将自身的 runid 和 offset 偏移量发送给从节点，响应为 +FULLRESYNC {runid} {offset}。</li>
+<li>从节点接受主节点的响应后，会保存主节点的 runid 和偏移量</li>
+<li>主节点执行 bgsave 保存 RDB 文件到本地，主节点发送 RDB 文件给从节点，从节点把接受的 RDB 文件保存在本地，并直接作为从节点的数据文件，接受完 RDB 文件后从节点打印相关日志。</li>
+<li>从节点开始接受 RDB 文件到接受完成期间，主节点仍然响应读写命令，因此主节点会把这期间写命令保存在客户端的缓冲区中，当从节点加载完 RDB 文件后，主节点在把缓冲区的数据发送给从节点，已保证主从之间的数据一致性。如果主节点和从节点 RDB 文件的数据传输时间过长时，按上面分析可能会造成客户端的缓冲区溢出。默认配置为 client-output-buffer-limit slave 256MB 64MB 60。 如果 60 秒内缓冲区消耗大于 64MB 或者超过 256MB 时，主节点将直接关闭客户端连接，造成全量同步失败。</li>
+<li>从节点接受完主节点传送来的全部数据后会清空自身的旧数据。</li>
+<li>从节点成功加载完 RDB 文件后，如果当前节点开启了 AOF 持久化功能，它会立刻做 AOF 重写操作 (bgrewriteaof) 操作，为了保证全量复制后 AOF 持久化文件立刻可用</li>
+</ul>
+<h5 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h5><blockquote>
+<p>部分复制主要是 Redis 针对全量复制的过高开销做出的一种优化措施</p>
+</blockquote>
+<ul>
+<li>当主从节点之间网络出现中断时，如果超过 repl-timeout 时间，主节点会认为从节点故障并中断复制连接。</li>
+<li>由于主节点没有宕机，所以他依然会响应客户端命令，但因复制连接中断命令无法发送给从节点，但主节点内部会将这段时间的命令保存在客户端缓冲区中，默认大小为 1MB。</li>
+<li>当主从节点网络恢复后，从节点会再次连接上主节点。当主从节点连接恢复后，由于从节点之前保存了自身的偏移量和主节点的运行 id。因此会把它们当作 psync 参数发送给主节点，要求进行部分复制操作。</li>
+<li>主节点接受从节点的 psync 命令，会先核对请求的 runid 是否和自身的的 runid 一致，如果一致，说明该从节点复制的当前主节点。然后查偏移量是否相等，如果不等则进行部分复制，如果相同则表示数据一致不需要复制</li>
+<li>在进行部分复制时，主节点只需要根据偏移量将复制积压缓冲区的数据发送给从节点，保证主从复制进入正常状态</li>
+</ul>
+<h5 id="心跳"><a href="#心跳" class="headerlink" title="心跳"></a>心跳</h5><p>在命令传播阶段，除了发送写命令，主从节点还维持着心跳机制：ping 和 replconf ack。心跳机制对于主从复制的超时判断、数据安全等有作用。</p>
+<p>主从节点彼此都有心跳检测机制，各自模拟成对方的客户端进行通信，通过 client list 命令查看复制客户端信息，主节点的连接状态为 flags &#x3D; M，从节点连接状态为 flags &#x3D; S。<br>主节点默认每隔 10 秒对从节点发送 ping 命令，判断从节点的存活性和连接状态，可能通过 repl-ping-slave-period 参数修改发送频率。<br>从节点在主线程中每隔 1 秒发送 replconf ack{offset} 命令，给主节点上报自身当前的偏移量。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="http://example.com">201</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2023/12/01/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/">http://example.com/2023/12/01/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://example.com" target="_blank">201_blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Redis/">Redis</a></div><div class="post_share"><div class="social-share" data-image="/top_img/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6top_img.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/2023/11/17/MVCC%E6%9C%BA%E5%88%B6/" title="MVCC机制"><img class="cover" src="/top_img/MVCC%E6%9C%BA%E5%88%B6top_img.jpeg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">MVCC机制</div></div></a></div></nav></div></main><footer id="footer" style="background-image: url('/top_img/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6top_img.jpg')"><div id="footer-wrap"><div class="copyright">&copy;2023 By 201</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div><div class="footer_custom_text">Hi,  welcome  to  my  <a target="_blank" rel="noopener" href="https://11001001.cn/">  blog</a>!</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.umd.min.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据库加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js"></script></div></div></body></html>
