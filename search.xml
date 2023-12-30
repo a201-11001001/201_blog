@@ -275,6 +275,54 @@
       </tags>
   </entry>
   <entry>
+    <title>mysqldump 在linux中的定时备份</title>
+    <url>/2023/08/25/mysqldump-%E5%9C%A8linux%E4%B8%AD%E7%9A%84%E5%AE%9A%E6%97%B6%E5%A4%87%E4%BB%BD/</url>
+    <content><![CDATA[<h4 id="Mysql-在Linux-中的备份"><a href="#Mysql-在Linux-中的备份" class="headerlink" title="Mysql 在Linux 中的备份"></a>Mysql 在Linux 中的备份</h4><ul>
+<li><p>准备环境</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -V</span><br><span class="line">mysql  Ver 14.14 Distrib 5.7.43, for Linux (x86_64) using  EditLine wrapper</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>配置MySql vim&#x2F;etc&#x2F;my.cof mysql 5.7之后需要配置文件中加入以下代码</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[client]</span><br><span class="line">host=127.0.0.1</span><br><span class="line">user=root</span><br><span class="line">password=&#x27;jzkj@2023#$&#x27;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>测试备份命令 生成sql 文件</p>
+<blockquote>
+<p>mysql dump-u用户名-p数据库密码–default-character-set&#x3D;utf8要备份的数据库&gt;&#x2F;back&#x2F;备份路径及文件名.sq1</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">出现警告不用管 </span><br><span class="line">mysqldump: [Warning] Using a password on the command line interface can be insecure.</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>备份后的文件内容</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- MySQL dump 10.13  Distrib 5.7.43, for Linux (x86_64)</span><br><span class="line">--</span><br><span class="line">-- Host: 127.0.0.1    Database: jz_lxny</span><br><span class="line">-- ------------------------------------------------------</span><br><span class="line">-- Server version       5.7.43</span><br><span class="line"></span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;</span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;</span><br><span class="line">/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;</span><br><span class="line">/*!40101 SET NAMES utf8 */;</span><br><span class="line">/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;</span><br><span class="line">/*!40103 SET TIME_ZONE=&#x27;+00:00&#x27; */;</span><br><span class="line">/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;</span><br><span class="line">/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;</span><br><span class="line">/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=&#x27;NO_AUTO_VALUE_ON_ZERO&#x27; */;</span><br><span class="line">/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;</span><br><span class="line"></span><br><span class="line">--</span><br><span class="line">-- Table structure for table `ces_order_customer`</span><br><span class="line">-- </span><br></pre></td></tr></table></figure>
+</li>
+<li><p>sql 备份恢复</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 1.登录 MySQL </span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos /]# mysql -u root -p</span><br><span class="line">Enter password: </span><br><span class="line">Welcome to the MySQL monitor.  Commands end with ; or \g.</span><br><span class="line">Your MySQL connection id is 24</span><br><span class="line">Server version: 5.7.43 MySQL Community Server (GPL)</span><br><span class="line"></span><br><span class="line">Copyright (c) 2000, 2023, Oracle and/or its affiliates.</span><br><span class="line"></span><br><span class="line">Oracle is a registered trademark of Oracle Corporation and/or its</span><br><span class="line">affiliates. Other names may be trademarks of their respective</span><br><span class="line">owners.</span><br><span class="line"></span><br><span class="line">Type &#x27;help;&#x27; or &#x27;\h&#x27; for help. Type &#x27;\c&#x27; to clear the current input statement.</span><br><span class="line"></span><br><span class="line">mysql&gt; </span><br></pre></td></tr></table></figure></li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 2.切换要备份的数据库</span><br><span class="line">## 数据库已经存在情况下先切换 数据库 (第一次登录没有自定数据库默认是在 mysql 下)</span><br><span class="line">## 使用 use 命令切换数据库</span><br><span class="line"></span><br><span class="line">mysql&gt; use back_test</span><br><span class="line">Reading table information for completion of table and column names</span><br><span class="line">You can turn off this feature to get a quicker startup with -A</span><br><span class="line"></span><br><span class="line">Database changed</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 3.使用 source 命令 回复备份</span><br><span class="line">source /back/要恢复的文件备份.sql</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 4.出现效果表示成功</span><br><span class="line">mysql&gt; source /back_lxny_test_001.sql</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>在linx中使通过定时任务(crontab)白动备份my sq数据库<blockquote>
+<p>创建mysqldump 脚本</p>
+</blockquote>
+</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">  </span><br><span class="line">#备份位置</span><br><span class="line">backup_dir=&#x27;/usr/data/backup/mysql/&#x27;</span><br><span class="line">#获取当前时间</span><br><span class="line">current_time=$(date +&#x27;%Y-%m-%d_%H%M%S&#x27;)</span><br><span class="line">#将backup_dir和时间组合起来，再加个后缀</span><br><span class="line">filepath=$backup_dir$current_time&#x27;.sql.gz&#x27;</span><br><span class="line"></span><br><span class="line">#数据库信息，配置数据库账号密码</span><br><span class="line">s_ip=&#x27;127.0.0.1&#x27;</span><br><span class="line">username=&#x27;root&#x27;</span><br><span class="line">password=&#x27;xxx&#x27;</span><br><span class="line">source_database=&#x27;xxx&#x27;</span><br><span class="line"></span><br><span class="line">echo &quot;-----------------------&quot;$(date +%F%r)&quot;操作开始--------------------------------&quot;</span><br><span class="line">echo $(date +%F%r)&quot;开始进行数据备份...&quot;</span><br><span class="line"># 2&gt;/dev/null 可以抑制警告信息</span><br><span class="line">mysqldump -h$&#123;s_ip&#125; -P3306 -u $&#123;username&#125; -p&quot;$&#123;password&#125;&quot;  $&#123;source_database&#125; table1 table2 table3 | gzip &gt; $filepath</span><br><span class="line"></span><br><span class="line">echo $(date +%F%r)&quot;完成同步...&quot;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 测试脚本 创建脚本可执行命令</span><br><span class="line"></span><br><span class="line">chmod u+x  脚本名称.sh</span><br><span class="line"></span><br><span class="line">## 运行脚本 并解压 (gunzip)</span><br><span class="line">2924 -rw-r--r-- 1 root root 2990363 Aug 22 17:49 back_lxny_2023-08-22_174957.sql</span><br><span class="line"> 552 -rw-r--r-- 1 root root  563125 Aug 22 17:51 back_lxny_2023-08-22_175116.sql.gz</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>使用 crontab + mysqldump 创建定时备份任务</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 编辑当前用户定时任务 (没有crontab 可自行安装)</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line"></span><br><span class="line">## 运行上述命令后，会打开一个文本编辑器，可以在其中输入要执行的命令和时间规则。格式如下：</span><br><span class="line"></span><br><span class="line">* * * * * command</span><br><span class="line"></span><br><span class="line">## 其中，五个星号分别表示分钟、小时、日、月、周几，command 表示要执行的命令或脚本文件路径。</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">*    *    *    *    *</span><br><span class="line">-    -    -    -    -</span><br><span class="line">|    |    |    |    |</span><br><span class="line">|    |    |    |    +----------星期中星期几 (0 - 6) (星期天 为0)</span><br><span class="line">|    |    |    +---------------月份 (1 - 12) </span><br><span class="line">|    |    +--------------------一个月中的第几天 (1 - 31)</span><br><span class="line">|    +-------------------------小时 (0 - 23)</span><br><span class="line">+------------------------------分钟 (0 - 59)添加定时任务(每天12:50以及23:50执行备份操作)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 例如 </span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">05 18 * * *  /usr/local/mysql/mysql_lxny_back.sh</span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos back_lxny]# ll -s</span><br><span class="line">total 552</span><br><span class="line">552 -rw-r--r-- 1 root root 563126 Aug 22 18:05 back_lxny_2023-08-22_180501.sql.gz</span><br></pre></td></tr></table></figure>]]></content>
+      <tags>
+        <tag>MySql</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>保证接口数据安全</title>
     <url>/2023/09/08/%E4%BF%9D%E8%AF%81%E6%8E%A5%E5%8F%A3%E6%95%B0%E6%8D%AE%E5%AE%89%E5%85%A8/</url>
     <content><![CDATA[<h4 id="Jdk-实现数据加密"><a href="#Jdk-实现数据加密" class="headerlink" title="Jdk 实现数据加密"></a>Jdk 实现数据加密</h4><blockquote>
@@ -364,54 +412,6 @@
       <tags>
         <tag>方案设计</tag>
         <tag>序列化</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>mysqldump 在linux中的定时备份</title>
-    <url>/2023/08/25/mysqldump-%E5%9C%A8linux%E4%B8%AD%E7%9A%84%E5%AE%9A%E6%97%B6%E5%A4%87%E4%BB%BD/</url>
-    <content><![CDATA[<h4 id="Mysql-在Linux-中的备份"><a href="#Mysql-在Linux-中的备份" class="headerlink" title="Mysql 在Linux 中的备份"></a>Mysql 在Linux 中的备份</h4><ul>
-<li><p>准备环境</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -V</span><br><span class="line">mysql  Ver 14.14 Distrib 5.7.43, for Linux (x86_64) using  EditLine wrapper</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>配置MySql vim&#x2F;etc&#x2F;my.cof mysql 5.7之后需要配置文件中加入以下代码</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[client]</span><br><span class="line">host=127.0.0.1</span><br><span class="line">user=root</span><br><span class="line">password=&#x27;jzkj@2023#$&#x27;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>测试备份命令 生成sql 文件</p>
-<blockquote>
-<p>mysql dump-u用户名-p数据库密码–default-character-set&#x3D;utf8要备份的数据库&gt;&#x2F;back&#x2F;备份路径及文件名.sq1</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">出现警告不用管 </span><br><span class="line">mysqldump: [Warning] Using a password on the command line interface can be insecure.</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>备份后的文件内容</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- MySQL dump 10.13  Distrib 5.7.43, for Linux (x86_64)</span><br><span class="line">--</span><br><span class="line">-- Host: 127.0.0.1    Database: jz_lxny</span><br><span class="line">-- ------------------------------------------------------</span><br><span class="line">-- Server version       5.7.43</span><br><span class="line"></span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;</span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;</span><br><span class="line">/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;</span><br><span class="line">/*!40101 SET NAMES utf8 */;</span><br><span class="line">/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;</span><br><span class="line">/*!40103 SET TIME_ZONE=&#x27;+00:00&#x27; */;</span><br><span class="line">/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;</span><br><span class="line">/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;</span><br><span class="line">/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=&#x27;NO_AUTO_VALUE_ON_ZERO&#x27; */;</span><br><span class="line">/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;</span><br><span class="line"></span><br><span class="line">--</span><br><span class="line">-- Table structure for table `ces_order_customer`</span><br><span class="line">-- </span><br></pre></td></tr></table></figure>
-</li>
-<li><p>sql 备份恢复</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 1.登录 MySQL </span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos /]# mysql -u root -p</span><br><span class="line">Enter password: </span><br><span class="line">Welcome to the MySQL monitor.  Commands end with ; or \g.</span><br><span class="line">Your MySQL connection id is 24</span><br><span class="line">Server version: 5.7.43 MySQL Community Server (GPL)</span><br><span class="line"></span><br><span class="line">Copyright (c) 2000, 2023, Oracle and/or its affiliates.</span><br><span class="line"></span><br><span class="line">Oracle is a registered trademark of Oracle Corporation and/or its</span><br><span class="line">affiliates. Other names may be trademarks of their respective</span><br><span class="line">owners.</span><br><span class="line"></span><br><span class="line">Type &#x27;help;&#x27; or &#x27;\h&#x27; for help. Type &#x27;\c&#x27; to clear the current input statement.</span><br><span class="line"></span><br><span class="line">mysql&gt; </span><br></pre></td></tr></table></figure></li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 2.切换要备份的数据库</span><br><span class="line">## 数据库已经存在情况下先切换 数据库 (第一次登录没有自定数据库默认是在 mysql 下)</span><br><span class="line">## 使用 use 命令切换数据库</span><br><span class="line"></span><br><span class="line">mysql&gt; use back_test</span><br><span class="line">Reading table information for completion of table and column names</span><br><span class="line">You can turn off this feature to get a quicker startup with -A</span><br><span class="line"></span><br><span class="line">Database changed</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 3.使用 source 命令 回复备份</span><br><span class="line">source /back/要恢复的文件备份.sql</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 4.出现效果表示成功</span><br><span class="line">mysql&gt; source /back_lxny_test_001.sql</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>在linx中使通过定时任务(crontab)白动备份my sq数据库<blockquote>
-<p>创建mysqldump 脚本</p>
-</blockquote>
-</li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">  </span><br><span class="line">#备份位置</span><br><span class="line">backup_dir=&#x27;/usr/data/backup/mysql/&#x27;</span><br><span class="line">#获取当前时间</span><br><span class="line">current_time=$(date +&#x27;%Y-%m-%d_%H%M%S&#x27;)</span><br><span class="line">#将backup_dir和时间组合起来，再加个后缀</span><br><span class="line">filepath=$backup_dir$current_time&#x27;.sql.gz&#x27;</span><br><span class="line"></span><br><span class="line">#数据库信息，配置数据库账号密码</span><br><span class="line">s_ip=&#x27;127.0.0.1&#x27;</span><br><span class="line">username=&#x27;root&#x27;</span><br><span class="line">password=&#x27;xxx&#x27;</span><br><span class="line">source_database=&#x27;xxx&#x27;</span><br><span class="line"></span><br><span class="line">echo &quot;-----------------------&quot;$(date +%F%r)&quot;操作开始--------------------------------&quot;</span><br><span class="line">echo $(date +%F%r)&quot;开始进行数据备份...&quot;</span><br><span class="line"># 2&gt;/dev/null 可以抑制警告信息</span><br><span class="line">mysqldump -h$&#123;s_ip&#125; -P3306 -u $&#123;username&#125; -p&quot;$&#123;password&#125;&quot;  $&#123;source_database&#125; table1 table2 table3 | gzip &gt; $filepath</span><br><span class="line"></span><br><span class="line">echo $(date +%F%r)&quot;完成同步...&quot;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 测试脚本 创建脚本可执行命令</span><br><span class="line"></span><br><span class="line">chmod u+x  脚本名称.sh</span><br><span class="line"></span><br><span class="line">## 运行脚本 并解压 (gunzip)</span><br><span class="line">2924 -rw-r--r-- 1 root root 2990363 Aug 22 17:49 back_lxny_2023-08-22_174957.sql</span><br><span class="line"> 552 -rw-r--r-- 1 root root  563125 Aug 22 17:51 back_lxny_2023-08-22_175116.sql.gz</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>使用 crontab + mysqldump 创建定时备份任务</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 编辑当前用户定时任务 (没有crontab 可自行安装)</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line"></span><br><span class="line">## 运行上述命令后，会打开一个文本编辑器，可以在其中输入要执行的命令和时间规则。格式如下：</span><br><span class="line"></span><br><span class="line">* * * * * command</span><br><span class="line"></span><br><span class="line">## 其中，五个星号分别表示分钟、小时、日、月、周几，command 表示要执行的命令或脚本文件路径。</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">*    *    *    *    *</span><br><span class="line">-    -    -    -    -</span><br><span class="line">|    |    |    |    |</span><br><span class="line">|    |    |    |    +----------星期中星期几 (0 - 6) (星期天 为0)</span><br><span class="line">|    |    |    +---------------月份 (1 - 12) </span><br><span class="line">|    |    +--------------------一个月中的第几天 (1 - 31)</span><br><span class="line">|    +-------------------------小时 (0 - 23)</span><br><span class="line">+------------------------------分钟 (0 - 59)添加定时任务(每天12:50以及23:50执行备份操作)</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 例如 </span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">05 18 * * *  /usr/local/mysql/mysql_lxny_back.sh</span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos back_lxny]# ll -s</span><br><span class="line">total 552</span><br><span class="line">552 -rw-r--r-- 1 root root 563126 Aug 22 18:05 back_lxny_2023-08-22_180501.sql.gz</span><br></pre></td></tr></table></figure>]]></content>
-      <tags>
-        <tag>MySql</tag>
       </tags>
   </entry>
 </search>
