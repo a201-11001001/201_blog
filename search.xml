@@ -153,6 +153,53 @@
       </tags>
   </entry>
   <entry>
+    <title>Redis主从复制</title>
+    <url>/2023/12/07/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/</url>
+    <content><![CDATA[<h4 id="Redis主从复制实现原理"><a href="#Redis主从复制实现原理" class="headerlink" title="Redis主从复制实现原理"></a>Redis主从复制实现原理</h4><p>主从复制，是指将一台Redis服务器的数据，复制到其他的Redis服务器。前者称为主节点(master)，后者称为从节点(slave)；数据的复制是单向的，只能由主节点到从节点。</p>
+<h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><ul>
+<li>数据冗余(由于从节点是主节点的副本，主节点数据的备份可以在从节点上实现)</li>
+<li>高可用性(通过将数据复制到多个从节点，即使主节点发生故障，从节点可替代主节点提供服务，从而保障系统的高可用性。)</li>
+<li>读写分离(主节点提供写服务,从节点提供读服务,分担主节点的负载,提高系统的整体性能)</li>
+</ul>
+<h5 id="主从复制原理"><a href="#主从复制原理" class="headerlink" title="主从复制原理"></a>主从复制原理</h5><blockquote>
+<ul>
+<li>从服务向主服务器发送 psync 命令,主服务器收到命令后在本地生成 RDB 文件 &#x3D;&#x3D;&gt; </li>
+<li>生成 RDB 文件的同时会在本地创建缓冲区(用来存储 RDB 文件存储过程写入的新的命令) &#x3D;&#x3D;&gt; </li>
+<li>将RDB 文件发送到从服务器 &#x3D;&#x3D;&gt; </li>
+<li>从服务器收到之后先将本地的 RDB 文件删除,然后将发送过来的 RDB 文件在本地恢复 &#x3D;&#x3D;&gt;</li>
+<li>主服务器发送缓冲区的命令 &#x3D;&#x3D;&gt; </li>
+<li>从服务器开始接收缓存区的命令写入本地</li>
+</ul>
+</blockquote>
+<p><img src="/2023/12/07/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86.png" alt="Redis主从复制"></p>
+<h5 id="全量复制"><a href="#全量复制" class="headerlink" title="全量复制"></a>全量复制</h5><p>全量复制是 Redis 最早支持的复制方式，触发全量复制的命令是 sync 和 psync。</p>
+<ul>
+<li>从服务发送 psync 命令进行数据同步，由于是第一次进行复制，从节点没有复制偏移量和主节点运行 id，所以发送 psync ？-1。</li>
+<li>主节点接收从节点的命令后，主节点根据 psync ? -1 解析出当前为全量复制，所以回复 +FULLRESYNC，同时也会将自身的 runid 和 offset 偏移量发送给从节点，响应为 +FULLRESYNC {runid} {offset}。</li>
+<li>从节点接受主节点的响应后，会保存主节点的 runid 和偏移量</li>
+<li>主节点执行 bgsave 保存 RDB 文件到本地，主节点发送 RDB 文件给从节点，从节点把接受的 RDB 文件保存在本地，并直接作为从节点的数据文件，接受完 RDB 文件后从节点打印相关日志。</li>
+<li>从节点开始接受 RDB 文件到接受完成期间，主节点仍然响应读写命令，因此主节点会把这期间写命令保存在客户端的缓冲区中，当从节点加载完 RDB 文件后，主节点在把缓冲区的数据发送给从节点，已保证主从之间的数据一致性。如果主节点和从节点 RDB 文件的数据传输时间过长时，按上面分析可能会造成客户端的缓冲区溢出。默认配置为 client-output-buffer-limit slave 256MB 64MB 60。 如果 60 秒内缓冲区消耗大于 64MB 或者超过 256MB 时，主节点将直接关闭客户端连接，造成全量同步失败。</li>
+<li>从节点接受完主节点传送来的全部数据后会清空自身的旧数据。</li>
+<li>从节点成功加载完 RDB 文件后，如果当前节点开启了 AOF 持久化功能，它会立刻做 AOF 重写操作 (bgrewriteaof) 操作，为了保证全量复制后 AOF 持久化文件立刻可用</li>
+</ul>
+<h5 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h5><blockquote>
+<p>部分复制主要是 Redis 针对全量复制的过高开销做出的一种优化措施</p>
+</blockquote>
+<ul>
+<li>当主从节点之间网络出现中断时，如果超过 repl-timeout 时间，主节点会认为从节点故障并中断复制连接。</li>
+<li>由于主节点没有宕机，所以他依然会响应客户端命令，但因复制连接中断命令无法发送给从节点，但主节点内部会将这段时间的命令保存在客户端缓冲区中，默认大小为 1MB。</li>
+<li>当主从节点网络恢复后，从节点会再次连接上主节点。当主从节点连接恢复后，由于从节点之前保存了自身的偏移量和主节点的运行 id。因此会把它们当作 psync 参数发送给主节点，要求进行部分复制操作。</li>
+<li>主节点接受从节点的 psync 命令，会先核对请求的 runid 是否和自身的的 runid 一致，如果一致，说明该从节点复制的当前主节点。然后查偏移量是否相等，如果不等则进行部分复制，如果相同则表示数据一致不需要复制</li>
+<li>在进行部分复制时，主节点只需要根据偏移量将复制积压缓冲区的数据发送给从节点，保证主从复制进入正常状态</li>
+</ul>
+<h5 id="心跳"><a href="#心跳" class="headerlink" title="心跳"></a>心跳</h5><p>在命令传播阶段，除了发送写命令，主从节点还维持着心跳机制：ping 和 replconf ack。心跳机制对于主从复制的超时判断、数据安全等有作用。</p>
+<p>主从节点彼此都有心跳检测机制，各自模拟成对方的客户端进行通信，通过 client list 命令查看复制客户端信息，主节点的连接状态为 flags &#x3D; M，从节点连接状态为 flags &#x3D; S。<br>主节点默认每隔 10 秒对从节点发送 ping 命令，判断从节点的存活性和连接状态，可能通过 repl-ping-slave-period 参数修改发送频率。<br>从节点在主线程中每隔 1 秒发送 replconf ack{offset} 命令，给主节点上报自身当前的偏移量。</p>
+]]></content>
+      <tags>
+        <tag>Redis</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>RabbitMQ避免消息不丢失</title>
     <url>/2023/10/27/RabbitMQ%E9%81%BF%E5%85%8D%E6%B6%88%E6%81%AF%E4%B8%8D%E4%B8%A2%E5%A4%B1/</url>
     <content><![CDATA[<h4 id="RabbitMQ避免消息丢失"><a href="#RabbitMQ避免消息丢失" class="headerlink" title="RabbitMQ避免消息丢失"></a>RabbitMQ避免消息丢失</h4><hr>
@@ -225,101 +272,6 @@
 ]]></content>
       <tags>
         <tag>RabbitMQ</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Redis主从复制</title>
-    <url>/2023/12/07/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/</url>
-    <content><![CDATA[<h4 id="Redis主从复制实现原理"><a href="#Redis主从复制实现原理" class="headerlink" title="Redis主从复制实现原理"></a>Redis主从复制实现原理</h4><p>主从复制，是指将一台Redis服务器的数据，复制到其他的Redis服务器。前者称为主节点(master)，后者称为从节点(slave)；数据的复制是单向的，只能由主节点到从节点。</p>
-<h5 id="作用"><a href="#作用" class="headerlink" title="作用"></a>作用</h5><ul>
-<li>数据冗余(由于从节点是主节点的副本，主节点数据的备份可以在从节点上实现)</li>
-<li>高可用性(通过将数据复制到多个从节点，即使主节点发生故障，从节点可替代主节点提供服务，从而保障系统的高可用性。)</li>
-<li>读写分离(主节点提供写服务,从节点提供读服务,分担主节点的负载,提高系统的整体性能)</li>
-</ul>
-<h5 id="主从复制原理"><a href="#主从复制原理" class="headerlink" title="主从复制原理"></a>主从复制原理</h5><blockquote>
-<ul>
-<li>从服务向主服务器发送 psync 命令,主服务器收到命令后在本地生成 RDB 文件 &#x3D;&#x3D;&gt; </li>
-<li>生成 RDB 文件的同时会在本地创建缓冲区(用来存储 RDB 文件存储过程写入的新的命令) &#x3D;&#x3D;&gt; </li>
-<li>将RDB 文件发送到从服务器 &#x3D;&#x3D;&gt; </li>
-<li>从服务器收到之后先将本地的 RDB 文件删除,然后将发送过来的 RDB 文件在本地恢复 &#x3D;&#x3D;&gt;</li>
-<li>主服务器发送缓冲区的命令 &#x3D;&#x3D;&gt; </li>
-<li>从服务器开始接收缓存区的命令写入本地</li>
-</ul>
-</blockquote>
-<p><img src="/2023/12/07/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E5%8E%9F%E7%90%86.png" alt="Redis主从复制"></p>
-<h5 id="全量复制"><a href="#全量复制" class="headerlink" title="全量复制"></a>全量复制</h5><p>全量复制是 Redis 最早支持的复制方式，触发全量复制的命令是 sync 和 psync。</p>
-<ul>
-<li>从服务发送 psync 命令进行数据同步，由于是第一次进行复制，从节点没有复制偏移量和主节点运行 id，所以发送 psync ？-1。</li>
-<li>主节点接收从节点的命令后，主节点根据 psync ? -1 解析出当前为全量复制，所以回复 +FULLRESYNC，同时也会将自身的 runid 和 offset 偏移量发送给从节点，响应为 +FULLRESYNC {runid} {offset}。</li>
-<li>从节点接受主节点的响应后，会保存主节点的 runid 和偏移量</li>
-<li>主节点执行 bgsave 保存 RDB 文件到本地，主节点发送 RDB 文件给从节点，从节点把接受的 RDB 文件保存在本地，并直接作为从节点的数据文件，接受完 RDB 文件后从节点打印相关日志。</li>
-<li>从节点开始接受 RDB 文件到接受完成期间，主节点仍然响应读写命令，因此主节点会把这期间写命令保存在客户端的缓冲区中，当从节点加载完 RDB 文件后，主节点在把缓冲区的数据发送给从节点，已保证主从之间的数据一致性。如果主节点和从节点 RDB 文件的数据传输时间过长时，按上面分析可能会造成客户端的缓冲区溢出。默认配置为 client-output-buffer-limit slave 256MB 64MB 60。 如果 60 秒内缓冲区消耗大于 64MB 或者超过 256MB 时，主节点将直接关闭客户端连接，造成全量同步失败。</li>
-<li>从节点接受完主节点传送来的全部数据后会清空自身的旧数据。</li>
-<li>从节点成功加载完 RDB 文件后，如果当前节点开启了 AOF 持久化功能，它会立刻做 AOF 重写操作 (bgrewriteaof) 操作，为了保证全量复制后 AOF 持久化文件立刻可用</li>
-</ul>
-<h5 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h5><blockquote>
-<p>部分复制主要是 Redis 针对全量复制的过高开销做出的一种优化措施</p>
-</blockquote>
-<ul>
-<li>当主从节点之间网络出现中断时，如果超过 repl-timeout 时间，主节点会认为从节点故障并中断复制连接。</li>
-<li>由于主节点没有宕机，所以他依然会响应客户端命令，但因复制连接中断命令无法发送给从节点，但主节点内部会将这段时间的命令保存在客户端缓冲区中，默认大小为 1MB。</li>
-<li>当主从节点网络恢复后，从节点会再次连接上主节点。当主从节点连接恢复后，由于从节点之前保存了自身的偏移量和主节点的运行 id。因此会把它们当作 psync 参数发送给主节点，要求进行部分复制操作。</li>
-<li>主节点接受从节点的 psync 命令，会先核对请求的 runid 是否和自身的的 runid 一致，如果一致，说明该从节点复制的当前主节点。然后查偏移量是否相等，如果不等则进行部分复制，如果相同则表示数据一致不需要复制</li>
-<li>在进行部分复制时，主节点只需要根据偏移量将复制积压缓冲区的数据发送给从节点，保证主从复制进入正常状态</li>
-</ul>
-<h5 id="心跳"><a href="#心跳" class="headerlink" title="心跳"></a>心跳</h5><p>在命令传播阶段，除了发送写命令，主从节点还维持着心跳机制：ping 和 replconf ack。心跳机制对于主从复制的超时判断、数据安全等有作用。</p>
-<p>主从节点彼此都有心跳检测机制，各自模拟成对方的客户端进行通信，通过 client list 命令查看复制客户端信息，主节点的连接状态为 flags &#x3D; M，从节点连接状态为 flags &#x3D; S。<br>主节点默认每隔 10 秒对从节点发送 ping 命令，判断从节点的存活性和连接状态，可能通过 repl-ping-slave-period 参数修改发送频率。<br>从节点在主线程中每隔 1 秒发送 replconf ack{offset} 命令，给主节点上报自身当前的偏移量。</p>
-]]></content>
-      <tags>
-        <tag>Redis</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>mysqldump 在linux中的定时备份</title>
-    <url>/2023/08/25/mysqldump-%E5%9C%A8linux%E4%B8%AD%E7%9A%84%E5%AE%9A%E6%97%B6%E5%A4%87%E4%BB%BD/</url>
-    <content><![CDATA[<h4 id="Mysql-在Linux-中的备份"><a href="#Mysql-在Linux-中的备份" class="headerlink" title="Mysql 在Linux 中的备份"></a>Mysql 在Linux 中的备份</h4><ul>
-<li><p>准备环境</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -V</span><br><span class="line">mysql  Ver 14.14 Distrib 5.7.43, for Linux (x86_64) using  EditLine wrapper</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>配置MySql vim&#x2F;etc&#x2F;my.cof mysql 5.7之后需要配置文件中加入以下代码</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[client]</span><br><span class="line">host=127.0.0.1</span><br><span class="line">user=root</span><br><span class="line">password=&#x27;jzkj@2023#$&#x27;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>测试备份命令 生成sql 文件</p>
-<blockquote>
-<p>mysql dump-u用户名-p数据库密码–default-character-set&#x3D;utf8要备份的数据库&gt;&#x2F;back&#x2F;备份路径及文件名.sq1</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">出现警告不用管 </span><br><span class="line">mysqldump: [Warning] Using a password on the command line interface can be insecure.</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>备份后的文件内容</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- MySQL dump 10.13  Distrib 5.7.43, for Linux (x86_64)</span><br><span class="line">--</span><br><span class="line">-- Host: 127.0.0.1    Database: jz_lxny</span><br><span class="line">-- ------------------------------------------------------</span><br><span class="line">-- Server version       5.7.43</span><br><span class="line"></span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;</span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;</span><br><span class="line">/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;</span><br><span class="line">/*!40101 SET NAMES utf8 */;</span><br><span class="line">/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;</span><br><span class="line">/*!40103 SET TIME_ZONE=&#x27;+00:00&#x27; */;</span><br><span class="line">/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;</span><br><span class="line">/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;</span><br><span class="line">/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=&#x27;NO_AUTO_VALUE_ON_ZERO&#x27; */;</span><br><span class="line">/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;</span><br><span class="line"></span><br><span class="line">--</span><br><span class="line">-- Table structure for table `ces_order_customer`</span><br><span class="line">-- </span><br></pre></td></tr></table></figure>
-</li>
-<li><p>sql 备份恢复</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 1.登录 MySQL </span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos /]# mysql -u root -p</span><br><span class="line">Enter password: </span><br><span class="line">Welcome to the MySQL monitor.  Commands end with ; or \g.</span><br><span class="line">Your MySQL connection id is 24</span><br><span class="line">Server version: 5.7.43 MySQL Community Server (GPL)</span><br><span class="line"></span><br><span class="line">Copyright (c) 2000, 2023, Oracle and/or its affiliates.</span><br><span class="line"></span><br><span class="line">Oracle is a registered trademark of Oracle Corporation and/or its</span><br><span class="line">affiliates. Other names may be trademarks of their respective</span><br><span class="line">owners.</span><br><span class="line"></span><br><span class="line">Type &#x27;help;&#x27; or &#x27;\h&#x27; for help. Type &#x27;\c&#x27; to clear the current input statement.</span><br><span class="line"></span><br><span class="line">mysql&gt; </span><br></pre></td></tr></table></figure></li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 2.切换要备份的数据库</span><br><span class="line">## 数据库已经存在情况下先切换 数据库 (第一次登录没有自定数据库默认是在 mysql 下)</span><br><span class="line">## 使用 use 命令切换数据库</span><br><span class="line"></span><br><span class="line">mysql&gt; use back_test</span><br><span class="line">Reading table information for completion of table and column names</span><br><span class="line">You can turn off this feature to get a quicker startup with -A</span><br><span class="line"></span><br><span class="line">Database changed</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 3.使用 source 命令 回复备份</span><br><span class="line">source /back/要恢复的文件备份.sql</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 4.出现效果表示成功</span><br><span class="line">mysql&gt; source /back_lxny_test_001.sql</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>在linx中使通过定时任务(crontab)白动备份my sq数据库<blockquote>
-<p>创建mysqldump 脚本</p>
-</blockquote>
-</li>
-</ul>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">  </span><br><span class="line">#备份位置</span><br><span class="line">backup_dir=&#x27;/usr/data/backup/mysql/&#x27;</span><br><span class="line">#获取当前时间</span><br><span class="line">current_time=$(date +&#x27;%Y-%m-%d_%H%M%S&#x27;)</span><br><span class="line">#将backup_dir和时间组合起来，再加个后缀</span><br><span class="line">filepath=$backup_dir$current_time&#x27;.sql.gz&#x27;</span><br><span class="line"></span><br><span class="line">#数据库信息，配置数据库账号密码</span><br><span class="line">s_ip=&#x27;127.0.0.1&#x27;</span><br><span class="line">username=&#x27;root&#x27;</span><br><span class="line">password=&#x27;xxx&#x27;</span><br><span class="line">source_database=&#x27;xxx&#x27;</span><br><span class="line"></span><br><span class="line">echo &quot;-----------------------&quot;$(date +%F%r)&quot;操作开始--------------------------------&quot;</span><br><span class="line">echo $(date +%F%r)&quot;开始进行数据备份...&quot;</span><br><span class="line"># 2&gt;/dev/null 可以抑制警告信息</span><br><span class="line">mysqldump -h$&#123;s_ip&#125; -P3306 -u $&#123;username&#125; -p&quot;$&#123;password&#125;&quot;  $&#123;source_database&#125; table1 table2 table3 | gzip &gt; $filepath</span><br><span class="line"></span><br><span class="line">echo $(date +%F%r)&quot;完成同步...&quot;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 测试脚本 创建脚本可执行命令</span><br><span class="line"></span><br><span class="line">chmod u+x  脚本名称.sh</span><br><span class="line"></span><br><span class="line">## 运行脚本 并解压 (gunzip)</span><br><span class="line">2924 -rw-r--r-- 1 root root 2990363 Aug 22 17:49 back_lxny_2023-08-22_174957.sql</span><br><span class="line"> 552 -rw-r--r-- 1 root root  563125 Aug 22 17:51 back_lxny_2023-08-22_175116.sql.gz</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>使用 crontab + mysqldump 创建定时备份任务</p>
-</blockquote>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 编辑当前用户定时任务 (没有crontab 可自行安装)</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line"></span><br><span class="line">## 运行上述命令后，会打开一个文本编辑器，可以在其中输入要执行的命令和时间规则。格式如下：</span><br><span class="line"></span><br><span class="line">* * * * * command</span><br><span class="line"></span><br><span class="line">## 其中，五个星号分别表示分钟、小时、日、月、周几，command 表示要执行的命令或脚本文件路径。</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">*    *    *    *    *</span><br><span class="line">-    -    -    -    -</span><br><span class="line">|    |    |    |    |</span><br><span class="line">|    |    |    |    +----------星期中星期几 (0 - 6) (星期天 为0)</span><br><span class="line">|    |    |    +---------------月份 (1 - 12) </span><br><span class="line">|    |    +--------------------一个月中的第几天 (1 - 31)</span><br><span class="line">|    +-------------------------小时 (0 - 23)</span><br><span class="line">+------------------------------分钟 (0 - 59)添加定时任务(每天12:50以及23:50执行备份操作)</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 例如 </span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">05 18 * * *  /usr/local/mysql/mysql_lxny_back.sh</span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos back_lxny]# ll -s</span><br><span class="line">total 552</span><br><span class="line">552 -rw-r--r-- 1 root root 563126 Aug 22 18:05 back_lxny_2023-08-22_180501.sql.gz</span><br></pre></td></tr></table></figure>]]></content>
-      <tags>
-        <tag>MySql</tag>
       </tags>
   </entry>
   <entry>
@@ -412,6 +364,54 @@
       <tags>
         <tag>方案设计</tag>
         <tag>序列化</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>mysqldump 在linux中的定时备份</title>
+    <url>/2023/08/25/mysqldump-%E5%9C%A8linux%E4%B8%AD%E7%9A%84%E5%AE%9A%E6%97%B6%E5%A4%87%E4%BB%BD/</url>
+    <content><![CDATA[<h4 id="Mysql-在Linux-中的备份"><a href="#Mysql-在Linux-中的备份" class="headerlink" title="Mysql 在Linux 中的备份"></a>Mysql 在Linux 中的备份</h4><ul>
+<li><p>准备环境</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mysql -V</span><br><span class="line">mysql  Ver 14.14 Distrib 5.7.43, for Linux (x86_64) using  EditLine wrapper</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>配置MySql vim&#x2F;etc&#x2F;my.cof mysql 5.7之后需要配置文件中加入以下代码</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">[client]</span><br><span class="line">host=127.0.0.1</span><br><span class="line">user=root</span><br><span class="line">password=&#x27;jzkj@2023#$&#x27;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>测试备份命令 生成sql 文件</p>
+<blockquote>
+<p>mysql dump-u用户名-p数据库密码–default-character-set&#x3D;utf8要备份的数据库&gt;&#x2F;back&#x2F;备份路径及文件名.sq1</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">出现警告不用管 </span><br><span class="line">mysqldump: [Warning] Using a password on the command line interface can be insecure.</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>备份后的文件内容</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">-- MySQL dump 10.13  Distrib 5.7.43, for Linux (x86_64)</span><br><span class="line">--</span><br><span class="line">-- Host: 127.0.0.1    Database: jz_lxny</span><br><span class="line">-- ------------------------------------------------------</span><br><span class="line">-- Server version       5.7.43</span><br><span class="line"></span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;</span><br><span class="line">/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;</span><br><span class="line">/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;</span><br><span class="line">/*!40101 SET NAMES utf8 */;</span><br><span class="line">/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;</span><br><span class="line">/*!40103 SET TIME_ZONE=&#x27;+00:00&#x27; */;</span><br><span class="line">/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;</span><br><span class="line">/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;</span><br><span class="line">/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE=&#x27;NO_AUTO_VALUE_ON_ZERO&#x27; */;</span><br><span class="line">/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;</span><br><span class="line"></span><br><span class="line">--</span><br><span class="line">-- Table structure for table `ces_order_customer`</span><br><span class="line">-- </span><br></pre></td></tr></table></figure>
+</li>
+<li><p>sql 备份恢复</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 1.登录 MySQL </span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos /]# mysql -u root -p</span><br><span class="line">Enter password: </span><br><span class="line">Welcome to the MySQL monitor.  Commands end with ; or \g.</span><br><span class="line">Your MySQL connection id is 24</span><br><span class="line">Server version: 5.7.43 MySQL Community Server (GPL)</span><br><span class="line"></span><br><span class="line">Copyright (c) 2000, 2023, Oracle and/or its affiliates.</span><br><span class="line"></span><br><span class="line">Oracle is a registered trademark of Oracle Corporation and/or its</span><br><span class="line">affiliates. Other names may be trademarks of their respective</span><br><span class="line">owners.</span><br><span class="line"></span><br><span class="line">Type &#x27;help;&#x27; or &#x27;\h&#x27; for help. Type &#x27;\c&#x27; to clear the current input statement.</span><br><span class="line"></span><br><span class="line">mysql&gt; </span><br></pre></td></tr></table></figure></li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 2.切换要备份的数据库</span><br><span class="line">## 数据库已经存在情况下先切换 数据库 (第一次登录没有自定数据库默认是在 mysql 下)</span><br><span class="line">## 使用 use 命令切换数据库</span><br><span class="line"></span><br><span class="line">mysql&gt; use back_test</span><br><span class="line">Reading table information for completion of table and column names</span><br><span class="line">You can turn off this feature to get a quicker startup with -A</span><br><span class="line"></span><br><span class="line">Database changed</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 3.使用 source 命令 回复备份</span><br><span class="line">source /back/要恢复的文件备份.sql</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 4.出现效果表示成功</span><br><span class="line">mysql&gt; source /back_lxny_test_001.sql</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>在linx中使通过定时任务(crontab)白动备份my sq数据库<blockquote>
+<p>创建mysqldump 脚本</p>
+</blockquote>
+</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#!/bin/bash</span><br><span class="line">  </span><br><span class="line">#备份位置</span><br><span class="line">backup_dir=&#x27;/usr/data/backup/mysql/&#x27;</span><br><span class="line">#获取当前时间</span><br><span class="line">current_time=$(date +&#x27;%Y-%m-%d_%H%M%S&#x27;)</span><br><span class="line">#将backup_dir和时间组合起来，再加个后缀</span><br><span class="line">filepath=$backup_dir$current_time&#x27;.sql.gz&#x27;</span><br><span class="line"></span><br><span class="line">#数据库信息，配置数据库账号密码</span><br><span class="line">s_ip=&#x27;127.0.0.1&#x27;</span><br><span class="line">username=&#x27;root&#x27;</span><br><span class="line">password=&#x27;xxx&#x27;</span><br><span class="line">source_database=&#x27;xxx&#x27;</span><br><span class="line"></span><br><span class="line">echo &quot;-----------------------&quot;$(date +%F%r)&quot;操作开始--------------------------------&quot;</span><br><span class="line">echo $(date +%F%r)&quot;开始进行数据备份...&quot;</span><br><span class="line"># 2&gt;/dev/null 可以抑制警告信息</span><br><span class="line">mysqldump -h$&#123;s_ip&#125; -P3306 -u $&#123;username&#125; -p&quot;$&#123;password&#125;&quot;  $&#123;source_database&#125; table1 table2 table3 | gzip &gt; $filepath</span><br><span class="line"></span><br><span class="line">echo $(date +%F%r)&quot;完成同步...&quot;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 测试脚本 创建脚本可执行命令</span><br><span class="line"></span><br><span class="line">chmod u+x  脚本名称.sh</span><br><span class="line"></span><br><span class="line">## 运行脚本 并解压 (gunzip)</span><br><span class="line">2924 -rw-r--r-- 1 root root 2990363 Aug 22 17:49 back_lxny_2023-08-22_174957.sql</span><br><span class="line"> 552 -rw-r--r-- 1 root root  563125 Aug 22 17:51 back_lxny_2023-08-22_175116.sql.gz</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>使用 crontab + mysqldump 创建定时备份任务</p>
+</blockquote>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 编辑当前用户定时任务 (没有crontab 可自行安装)</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line"></span><br><span class="line">## 运行上述命令后，会打开一个文本编辑器，可以在其中输入要执行的命令和时间规则。格式如下：</span><br><span class="line"></span><br><span class="line">* * * * * command</span><br><span class="line"></span><br><span class="line">## 其中，五个星号分别表示分钟、小时、日、月、周几，command 表示要执行的命令或脚本文件路径。</span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">*    *    *    *    *</span><br><span class="line">-    -    -    -    -</span><br><span class="line">|    |    |    |    |</span><br><span class="line">|    |    |    |    +----------星期中星期几 (0 - 6) (星期天 为0)</span><br><span class="line">|    |    |    +---------------月份 (1 - 12) </span><br><span class="line">|    |    +--------------------一个月中的第几天 (1 - 31)</span><br><span class="line">|    +-------------------------小时 (0 - 23)</span><br><span class="line">+------------------------------分钟 (0 - 59)添加定时任务(每天12:50以及23:50执行备份操作)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">## 例如 </span><br><span class="line"></span><br><span class="line">crontab -e</span><br><span class="line">05 18 * * *  /usr/local/mysql/mysql_lxny_back.sh</span><br><span class="line"></span><br><span class="line">[root@VM-0-16-centos back_lxny]# ll -s</span><br><span class="line">total 552</span><br><span class="line">552 -rw-r--r-- 1 root root 563126 Aug 22 18:05 back_lxny_2023-08-22_180501.sql.gz</span><br></pre></td></tr></table></figure>]]></content>
+      <tags>
+        <tag>MySql</tag>
       </tags>
   </entry>
 </search>
