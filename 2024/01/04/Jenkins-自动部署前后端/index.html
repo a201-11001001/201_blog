@@ -1,0 +1,241 @@
+<!DOCTYPE html><html class="hide-aside" lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Jenkins 自动部署前后端 | 201_blog</title><meta name="author" content="201"><meta name="copyright" content="201"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="Jenkins 自动部署">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jenkins 自动部署前后端">
+<meta property="og:url" content="http://example.com/2024/01/04/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/index.html">
+<meta property="og:site_name" content="201_blog">
+<meta property="og:description" content="Jenkins 自动部署">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@blog-static-jenkins/source/top_img/Jenkins%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E6%80%BB%E7%BB%93.jpg">
+<meta property="article:published_time" content="2024-01-04T10:03:01.000Z">
+<meta property="article:modified_time" content="2024-01-04T14:37:00.843Z">
+<meta property="article:author" content="201">
+<meta property="article:tag" content="Jenkins">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@blog-static-jenkins/source/top_img/Jenkins%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E6%80%BB%E7%BB%93.jpg"><link rel="shortcut icon" href="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/avatar.jpg"><link rel="canonical" href="http://example.com/2024/01/04/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"languages":{"hits_empty":"找不到您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: true,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Jenkins 自动部署前后端',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: false,
+  postUpdate: '2024-01-04 22:37:00'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/avatar.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">8</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">9</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@blog-static-jenkins/source/top_img/Jenkins自动部署总结.jpg')"><nav id="nav"><span id="blog-info"><a href="/" title="201_blog"><span class="site-name">201_blog</span></a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search" href="javascript:void(0);"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 主页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">Jenkins 自动部署前后端</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2024-01-04T10:03:01.000Z" title="发表于 2024-01-04 18:03:01">2024-01-04</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2024-01-04T14:37:00.843Z" title="更新于 2024-01-04 22:37:00">2024-01-04</time></span></div><div class="meta-secondline"></div></div></div></header><main class="layout hide-aside" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h3 id="Jenkins-问题及总结"><a href="#Jenkins-问题及总结" class="headerlink" title="Jenkins 问题及总结"></a>Jenkins 问题及总结</h3><blockquote>
+<p>成品展示</p>
+</blockquote>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/show.png"></p>
+<h5 id="准备工作"><a href="#准备工作" class="headerlink" title="准备工作"></a>准备工作</h5><blockquote>
+<p>jenkins 默认安装目录在 &#x2F;root&#x2F;.jenkins&#x2F;workspace&#x2F; 后期git 下载下来的文件回存放在这里</p>
+</blockquote>
+<ul>
+<li>全局安装 提前在服务器安装好所需要的 jdk、git、maven、nodeJs(npm 记得切换淘宝镜像),将安装路径贴到jenkins 全局工具配置中</li>
+</ul>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/applicationConfig.png"></p>
+<ul>
+<li>安装插件 git、maven 等</li>
+</ul>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/jenkins-plugins.png"></p>
+<ul>
+<li>准备工作完成 开始创建maven项目</li>
+</ul>
+<blockquote>
+<p>注意 使用 Git 需要添加凭证 按照自己的需求创建合适的</p>
+</blockquote>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/config-maven.png"></p>
+<ul>
+<li>注意后置配置 创建shell 脚本</li>
+</ul>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/shell.png"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">## cp -u : 回根据是否时最新时间进行复制</span><br><span class="line">cp -u /root/.jenkins/workspace/jz-erp/jeecg-boot-module-system/target/jeecg-boot-module-system-erp-3.2.0.jar /jenkins-workspace/jz-erp </span><br><span class="line">cd /jenkins-workspace/jz-erp/</span><br><span class="line">## 创建的启动脚本</span><br><span class="line">./start.sh </span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">## 创建start.sh 启动脚本</span><br><span class="line">#!/bin/sh</span><br><span class="line"></span><br><span class="line">#jar名称</span><br><span class="line">JAR_PATH=/jenkins-workspace/jz-erp/jeecg-boot-module-system-erp-3.2.0.jar</span><br><span class="line"></span><br><span class="line">PID=$(pgrep -f $JAR_PATH) # 获取进程号（PID）</span><br><span class="line">if [ -z &quot;$PID&quot; ]; then</span><br><span class="line">    echo &quot;Jar包未在运行中...&quot;</span><br><span class="line">    # 后台启动Jar包</span><br><span class="line">    nohup java -jar $JAR_PATH  &gt; /jenkins-workspace/jz-erp/jz-erp.log 2&gt;&amp;1 &amp;    #启动jar包服务，并将输出写入到Java.log文件中，前面的&amp;表示且&gt;，后面的&amp;表示后台执行</span><br><span class="line">    B=`netstat -tlpn |grep java|grep :$PORT|wc -l`   #8300是jar包服务调用的端口</span><br><span class="line">    if [ -n $B ]; then   #判断jar包服务是否成功启动</span><br><span class="line">      echo &#x27;部署成功&#x27;</span><br><span class="line">    else</span><br><span class="line">      echo &#x27;部署失败&#x27;</span><br><span class="line">    fi</span><br><span class="line"></span><br><span class="line">else</span><br><span class="line">    echo &quot;Jar包已经在运行中...&quot;</span><br><span class="line">    echo &quot;kill 进程 $PID&quot;</span><br><span class="line">    kill -9 $PID</span><br><span class="line"></span><br><span class="line">    # 后台启动Jar包</span><br><span class="line">    nohup java -jar $JAR_PATH  &gt; /jenkins-workspace/jz-erp/jz-erp.log 2&gt;&amp;1 &amp;    #启动jar包服务，并将输出写入到Java.log文件中，前面的&amp;表示且&gt;</span><br><span class="line"> SSH  139.155.45.137: session closed</span><br><span class="line">按任意键重新连接tlpn |grep java|grep :$PORT|wc -l`   #8300是jar包服务调用的端口</span><br><span class="line">    if [ -n $B ]; then   #判断jar包服务是否成功启动</span><br><span class="line">      echo &quot;部署成功&quot;</span><br><span class="line">    else</span><br><span class="line">      echo &#x27;部署失败&#x27;</span><br><span class="line">    fi</span><br><span class="line">fi  </span><br></pre></td></tr></table></figure>
+
+<p><code>chmod +x start.sh ## 给启动脚本权限 </code></p>
+<ul>
+<li>开始构建</li>
+</ul>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/start-building.png"></p>
+<p>查看控制台输出,遇到问题修复…等待 success 出现表示构建完成</p>
+<ul>
+<li>maven项目部署完成</li>
+</ul>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/success.png"></p>
+<h5 id="部署-nodeJs-前端项目"><a href="#部署-nodeJs-前端项目" class="headerlink" title="部署 nodeJs 前端项目"></a>部署 nodeJs 前端项目</h5><p>配置node安装地址、创建shell 脚本 ,其余步骤跟 maven 项目一致</p>
+<p><img src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@1.0.1/source/_posts/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/config-node.png"></p>
+<h5 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h5><p>[Jenkins 安装教程] <a target="_blank" rel="noopener" href="https://blog.csdn.net/ApexPredator/article/details/129694442">https://blog.csdn.net/ApexPredator/article/details/129694442</a></p>
+<p>[Jenkins 安装教程] <a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_43372633/article/details/130371782">https://blog.csdn.net/qq_43372633/article/details/130371782</a></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="http://example.com">201</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2024/01/04/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/">http://example.com/2024/01/04/Jenkins-%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%89%8D%E5%90%8E%E7%AB%AF/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://example.com" target="_blank">201_blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Jenkins/">Jenkins</a></div><div class="post_share"><div class="social-share" data-image="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@blog-static-jenkins/source/top_img/Jenkins自动部署总结.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/2023/12/07/Redis%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6/" title="Redis主从复制"><img class="cover" src= "https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/loading.gif" data-lazy-src="https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource/source/top_img/Redis主从复制top_img.jpg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">Redis主从复制</div></div></a></div></nav><hr class="custom-hr"/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="twikoo-wrap"></div></div></div></div></div></main><footer id="footer" style="background-image: url('https://cdn.jsdelivr.net/gh/a201-11001001/jsd_blog_staticSource@blog-static-jenkins/source/top_img/Jenkins自动部署总结.jpg')"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2024 By 201</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div><div class="footer_custom_text">Hi,  welcome  to  my  <a target="_blank" rel="noopener" href="https://11001001.cn/">  blog</a>!</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/vanilla-lazyload/dist/lazyload.iife.min.js"></script><div class="js-pjax"><script>(() => {
+  const init = () => {
+    twikoo.init(Object.assign({
+      el: '#twikoo-wrap',
+      envId: 'https://twikoo.11001001.cn/',
+      region: '',
+      onCommentLoaded: () => {
+        btf.loadLightbox(document.querySelectorAll('#twikoo .tk-content img:not(.tk-owo-emotion)'))
+      }
+    }, null))
+  }
+
+  const loadTwikoo = () => {
+    if (typeof twikoo === 'object') setTimeout(init,0)
+    else getScript('https://cdn.jsdelivr.net/npm/twikoo/dist/twikoo.all.min.js').then(init)
+  }
+
+  const getCount = () => {
+    const countELement = document.getElementById('twikoo-count')
+    if(!countELement) return
+    twikoo.getCommentsCount({
+      envId: 'https://twikoo.11001001.cn/',
+      region: '',
+      urls: [window.location.pathname],
+      includeReply: false
+    }).then(res => {
+      countELement.textContent = res[0].count
+    }).catch(err => {
+      console.error(err)
+    })
+  }
+
+  if ('Twikoo' === 'Twikoo' || !true) {
+    if (true) btf.loadComment(document.getElementById('twikoo-wrap'), loadTwikoo)
+    else {
+      loadTwikoo()
+      GLOBAL_CONFIG_SITE.isPost && getCount()
+    }
+  } else {
+    window.loadOtherComment = loadTwikoo
+  }
+})()</script></div><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据库加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js"></script></div></div></body></html>
